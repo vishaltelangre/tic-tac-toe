@@ -9,4 +9,4 @@ elm-app start
 ### To make production build
 
 ```
-elm-app build
+PUBLIC_URL=./ elm-app build
