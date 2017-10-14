@@ -42,17 +42,18 @@ td:hover {
 
 .boardHeader, .boardFooter {
   text-align: center;
+  line-height: 50px;
 }
 
 span.player {
-  font-size: 30px;
+  font-size: 25px;
   font-weight: 400;
-  vertical-align: middle;
+  vertical-align: top;
 }
 
 td.player {
   text-align: center;
-font-size: 75px;
+font-size: 60px;
 }
 
 .playerX {
@@ -61,4 +62,18 @@ font-size: 75px;
 
 .playerO {
   color: #ff0;
+}
+
+.newGame {
+    font-size: 16px;
+    background: rgba(15, 90, 15, 1);
+    border: 1px solid rgb(3, 53, 3);
+    color: #fff;
+    padding: 5px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.newGame:hover {
+  background: rgba(5, 65, 5, 1);
 }

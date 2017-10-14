@@ -232,13 +232,21 @@ viewBoardHeader model =
         view_ =
             case model.gameStatus of
                 InProgress ->
-                    viewCurrentPlayer model.currentPlayer
+                    span []
+                        [ text "Turn of "
+                        , viewPlayer model.currentPlayer
+                        , text " player!"
+                        ]
 
                 Drawn ->
-                    text "Drawn"
+                    text "Game is drawn!"
 
                 WonBy player ->
-                    text ("Won by " ++ toString player)
+                    span []
+                        [ text "Player "
+                        , viewPlayer player
+                        , text " is winner! 🎉"
+                        ]
 
                 NotStarted ->
                     text ""
@@ -247,9 +255,16 @@ viewBoardHeader model =
             [ view_ ]
 
 
+viewPlayer : Player -> Html Msg
+viewPlayer player =
+    span
+        [ class (playerCssClass (Just player)) ]
+        [ text (playerName player) ]
+
+
 viewBoardFooter : Model -> Html Msg
 viewBoardFooter model =
-    p [ class "boardFooter" ] [ startButton model.gameStatus ]
+    p [ class "boardFooter" ] [ buttonNewGame model.gameStatus ]
 
 
 board2D : Board -> List (List Cell)
@@ -280,11 +295,11 @@ viewCell cell =
         [ class (playerCssClass cell.owner)
         , onClick (OwnCell cell)
         ]
-        [ text (cellOwnerString cell.owner) ]
+        [ text (cellOwnerName cell.owner) ]
 
 
-cellOwnerString : Maybe Player -> String
-cellOwnerString owner =
+cellOwnerName : Maybe Player -> String
+cellOwnerName owner =
     case owner of
         Just player ->
             playerName player
@@ -295,10 +310,12 @@ cellOwnerString owner =
 
 viewCurrentPlayer : Player -> Html Msg
 viewCurrentPlayer player =
-    span [ class "topLine" ]
-        [ span [ class (playerCssClass (Just player)) ]
+    span []
+        [ text "Turn of "
+        , span
+            [ class (playerCssClass (Just player)) ]
             [ text (playerName player) ]
-        , text "'s turn!"
+        , text " player!"
         ]
 
 
@@ -306,30 +323,32 @@ playerName : Player -> String
 playerName player =
     case player of
         X ->
-            "✕"
+            "X"
 
         O ->
-            "●"
+            "O"
 
 
 playerCssClass : Maybe Player -> String
 playerCssClass player =
     case player of
         Just player_ ->
-            "player player" ++ toString player_
+            "player player" ++ playerName player_
 
         Nothing ->
             ""
 
 
-startButton : GameStatus -> Html Msg
-startButton gameStatus =
+buttonNewGame : GameStatus -> Html Msg
+buttonNewGame gameStatus =
     case gameStatus of
         InProgress ->
             text ""
 
         _ ->
-            button [ onClick NewGame ] [ text "Start New Game" ]
+            button
+                [ class "newGame", onClick NewGame ]
+                [ text "Start New Game" ]
 
 
 
