@@ -76,7 +76,7 @@ initBoard =
 
 type Msg
     = NewGame
-    | OwnCell CellLocation
+    | OwnCell Cell
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -89,26 +89,52 @@ update msg model =
             in
                 { newModel | gameStatus = InProgress } ! [ cmd ]
 
-        OwnCell cellLocation ->
+        OwnCell cell ->
             case model.gameStatus of
                 InProgress ->
-                    { model | board = ownCell cellLocation model.currentTurn model.board }
-                        ! []
+                    let
+                        ( newBoard, nextTurn ) =
+                            ownCell cell model.currentTurn model.board
+                    in
+                        { model | board = newBoard, currentTurn = nextTurn } ! []
 
                 _ ->
                     model ! []
 
 
-ownCell : CellLocation -> Player -> Board -> Board
-ownCell cellLocation currentPlayer board =
-    let
-        updateCell cell =
-            if cell.location == cellLocation then
-                { cell | owner = Just currentPlayer }
-            else
-                cell
-    in
-        List.map updateCell board
+ownCell : Cell -> Player -> Board -> ( Board, Player )
+ownCell cell currentPlayer board =
+    if canOwnCell cell currentPlayer then
+        let
+            updateCell cell_ =
+                if cell.location == cell_.location then
+                    { cell_ | owner = Just currentPlayer }
+                else
+                    cell_
+        in
+            ( List.map updateCell board, flipTurn currentPlayer )
+    else
+        ( board, currentPlayer )
+
+
+flipTurn : Player -> Player
+flipTurn currentPlayer =
+    case currentPlayer of
+        X ->
+            O
+
+        O ->
+            X
+
+
+canOwnCell : Cell -> Player -> Bool
+canOwnCell cell currentPlayer =
+    case cell.owner of
+        Just _ ->
+            False
+
+        Nothing ->
+            True
 
 
 
@@ -182,7 +208,7 @@ viewCell : Cell -> Html Msg
 viewCell cell =
     td
         [ class (playerCssClass cell.owner)
-        , onClick (OwnCell cell.location)
+        , onClick (OwnCell cell)
         ]
         [ text (cellOwnerString cell.owner) ]
 
