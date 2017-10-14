@@ -70,13 +70,13 @@ td.highlight {
 }
 
 .newGame {
-    font-size: 16px;
-    background: rgba(15, 90, 15, 1);
-    border: 1px solid rgb(3, 53, 3);
-    color: #fff;
-    padding: 5px;
-    border-radius: 5px;
-    cursor: pointer;
+  font-size: 16px;
+  background: rgba(15, 90, 15, 1);
+  border: 1px solid rgb(3, 53, 3);
+  color: #fff;
+  padding: 5px;
+  border-radius: 5px;
+  cursor: pointer;
 }
 
 .newGame:hover {
