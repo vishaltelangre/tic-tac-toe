@@ -22,6 +22,7 @@ type Player
 
 type alias Cell =
     { owner : Maybe Player
+    , highlight : Bool
     , location : CellLocation
     }
 
@@ -56,7 +57,7 @@ initBoard : Board
 initBoard =
     let
         cellAt row col =
-            CellLocation row col |> Cell Nothing
+            CellLocation row col |> Cell Nothing False
     in
         [ cellAt 0 0
         , cellAt 0 1
@@ -149,33 +150,64 @@ determineGameStatus model =
         opponent =
             flipPlayer model.currentPlayer
 
-        owners =
+        cellsAndOwners =
             winningMoves
-                |> List.map (cellOwnerAtLocation model.board |> List.map)
+                |> List.map (List.map <| cellOwnerAtLocation model.board)
 
         hasUnownedCells =
-            owners |> List.concat |> List.member Nothing
+            cellsAndOwners
+                |> List.concat
+                |> List.map Tuple.second
+                |> List.member Nothing
 
         expectedWinnerLine player =
-            List.repeat (numberOfRows model.board) (Just player)
+            Just player |> List.repeat (numberOfRows model.board)
+
+        matchesWinnerLine player line =
+            expectedWinnerLine player == List.map Tuple.second line
+
+        matchingWinnerLinesForPlayer player =
+            cellsAndOwners
+                |> List.filter (matchesWinnerLine player)
+
+        winningCells player =
+            matchingWinnerLinesForPlayer player
+                |> List.concat
+                |> List.map Tuple.first
 
         isWinner player =
-            owners
-                |> List.filter (\line -> line == expectedWinnerLine player)
+            matchingWinnerLinesForPlayer player
                 |> List.isEmpty
                 |> not
 
-        newStatus =
+        updatedStatusAndWinningCells =
             if isWinner model.currentPlayer then
-                WonBy model.currentPlayer
+                ( WonBy model.currentPlayer, winningCells model.currentPlayer )
             else if isWinner opponent then
-                WonBy opponent
+                ( WonBy opponent, winningCells opponent )
             else if hasUnownedCells then
-                model.gameStatus
+                ( model.gameStatus, [] )
             else
-                Drawn
+                ( Drawn, [] )
+
+        updatedStatus =
+            Tuple.first updatedStatusAndWinningCells
+
+        winningCellsToHighlight =
+            Tuple.second updatedStatusAndWinningCells
+
+        highlightWinningBoardCell boardCell =
+            { boardCell
+                | highlight = List.member (Just boardCell) winningCellsToHighlight
+            }
+
+        updatedBoard =
+            model.board |> List.map highlightWinningBoardCell
     in
-        { model | gameStatus = newStatus }
+        { model
+            | gameStatus = updatedStatus
+            , board = updatedBoard
+        }
 
 
 winningMoves : List (List CellLocation)
@@ -191,14 +223,14 @@ winningMoves =
     ]
 
 
-cellOwnerAtLocation : Board -> CellLocation -> Maybe Player
+cellOwnerAtLocation : Board -> CellLocation -> ( Maybe Cell, Maybe Player )
 cellOwnerAtLocation board location =
     case (cellAtLocation board location) of
         Just cell ->
-            cell.owner
+            ( Just cell, cell.owner )
 
         Nothing ->
-            Nothing
+            ( Nothing, Nothing )
 
 
 cellAtLocation : Board -> CellLocation -> Maybe Cell
@@ -291,11 +323,21 @@ viewRow row =
 
 viewCell : Cell -> Html Msg
 viewCell cell =
-    td
-        [ class (playerCssClass cell.owner)
-        , onClick (OwnCell cell)
-        ]
-        [ text (cellOwnerName cell.owner) ]
+    let
+        defaultClass =
+            playerCssClass cell.owner
+
+        updatedClass =
+            if cell.highlight then
+                defaultClass ++ " highlight"
+            else
+                defaultClass
+    in
+        td
+            [ class updatedClass
+            , onClick (OwnCell cell)
+            ]
+            [ text (cellOwnerName cell.owner) ]
 
 
 cellOwnerName : Maybe Player -> String
@@ -306,17 +348,6 @@ cellOwnerName owner =
 
         Nothing ->
             ""
-
-
-viewCurrentPlayer : Player -> Html Msg
-viewCurrentPlayer player =
-    span []
-        [ text "Turn of "
-        , span
-            [ class (playerCssClass (Just player)) ]
-            [ text (playerName player) ]
-        , text " player!"
-        ]
 
 
 playerName : Player -> String

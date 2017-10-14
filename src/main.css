@@ -56,6 +56,11 @@ td.player {
 font-size: 60px;
 }
 
+td.highlight {
+  border-color: #006b00;
+  box-shadow: 0px 0px 12px #256625;
+}
+
 .playerX {
   color: #f00;
 }
