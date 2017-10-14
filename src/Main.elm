@@ -95,8 +95,14 @@ update msg model =
                     let
                         ( newBoard, nextPlayer ) =
                             ownCell cell model.currentPlayer model.board
+
+                        updatedModel =
+                            { model
+                                | board = newBoard
+                                , currentPlayer = nextPlayer
+                            }
                     in
-                        { model | board = newBoard, currentPlayer = nextPlayer } ! []
+                        determineGameStatus updatedModel ! []
 
                 _ ->
                     model ! []
@@ -135,6 +141,71 @@ canOwnCell cell currentPlayer =
 
         Nothing ->
             True
+
+
+determineGameStatus : Model -> Model
+determineGameStatus model =
+    let
+        opponent =
+            flipPlayer model.currentPlayer
+
+        owners =
+            winningMoves
+                |> List.map (cellOwnerAtLocation model.board |> List.map)
+
+        hasUnownedCells =
+            owners |> List.concat |> List.member Nothing
+
+        expectedWinnerLine player =
+            List.repeat (numberOfRows model.board) (Just player)
+
+        isWinner player =
+            owners
+                |> List.filter (\line -> line == expectedWinnerLine player)
+                |> List.isEmpty
+                |> not
+
+        newStatus =
+            if isWinner model.currentPlayer then
+                WonBy model.currentPlayer
+            else if isWinner opponent then
+                WonBy opponent
+            else if hasUnownedCells then
+                model.gameStatus
+            else
+                Drawn
+    in
+        { model | gameStatus = newStatus }
+
+
+winningMoves : List (List CellLocation)
+winningMoves =
+    [ [ CellLocation 0 0, CellLocation 0 1, CellLocation 0 2 ]
+    , [ CellLocation 1 0, CellLocation 1 1, CellLocation 1 2 ]
+    , [ CellLocation 2 0, CellLocation 2 1, CellLocation 2 2 ]
+    , [ CellLocation 0 0, CellLocation 1 0, CellLocation 2 0 ]
+    , [ CellLocation 0 1, CellLocation 1 1, CellLocation 2 1 ]
+    , [ CellLocation 0 2, CellLocation 1 2, CellLocation 2 2 ]
+    , [ CellLocation 0 0, CellLocation 1 1, CellLocation 2 2 ]
+    , [ CellLocation 0 2, CellLocation 1 1, CellLocation 2 0 ]
+    ]
+
+
+cellOwnerAtLocation : Board -> CellLocation -> Maybe Player
+cellOwnerAtLocation board location =
+    case (cellAtLocation board location) of
+        Just cell ->
+            cell.owner
+
+        Nothing ->
+            Nothing
+
+
+cellAtLocation : Board -> CellLocation -> Maybe Cell
+cellAtLocation board location =
+    board
+        |> List.filter (\cell -> cell.location == location)
+        |> List.head
 
 
 
@@ -184,19 +255,18 @@ viewBoardFooter model =
 board2D : Board -> List (List Cell)
 board2D board =
     let
-        totalCells =
-            List.length board
-
-        rows =
-            totalCells |> toFloat |> sqrt |> round
-
         rowIndices =
-            List.range 0 (rows - 1)
+            List.range 0 ((numberOfRows board) - 1)
 
         cellsInRow row =
             List.filter (\cell -> row == cell.location.row) board
     in
         List.map cellsInRow rowIndices
+
+
+numberOfRows : Board -> Int
+numberOfRows board =
+    List.length board |> toFloat |> sqrt |> round
 
 
 viewRow : List Cell -> Html Msg
