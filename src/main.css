@@ -1,12 +1,38 @@
 body {
-  font-family: 'Source Sans Pro', 'Trebuchet MS', 'Lucida Grande', 'Bitstream Vera Sans', 'Helvetica Neue', sans-serif;
+  font-family: sans-serif;
   font-size: 14px;
   margin: 0;
-  text-align: center;
-  color: #293c4b;
+  color: #fff;
+  background: #111;
 }
 
-img {
-  margin: 20px 0;
-  max-width: 200px;
+#root {
+  width: 320px;
+  height: 320px;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: auto;
+}
+
+td, tr, table {
+  margin: 0;
+  padding: 0;
+}
+
+table {
+  border-spacing: 5px;
+}
+
+td {
+  border: 1px solid #111;
+  width: 100px;
+  height: 100px;
+  background: #000;
+}
+
+td:hover {
+  border-color: #fff;
 }

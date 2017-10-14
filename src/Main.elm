@@ -1,6 +1,6 @@
 module Main exposing (..)
 
-import Html exposing (Html, text, div)
+import Html exposing (Html, text, div, table, tr, td)
 
 
 ---- MODEL ----
@@ -87,7 +87,57 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    div [] [ text (toString model) ]
+    div []
+        [ table [] [ viewBoard model.board ]
+        ]
+
+
+viewBoard : Board -> Html Msg
+viewBoard board =
+    board |> board2D |> List.map viewRow |> table []
+
+
+board2D : Board -> List (List Cell)
+board2D board =
+    let
+        totalCells =
+            List.length board
+
+        rows =
+            totalCells |> toFloat |> sqrt |> round
+
+        rowIndices =
+            List.range 0 (rows - 1)
+
+        cellsInRow row =
+            List.filter (\cell -> row == cell.location.row) board
+    in
+        List.map cellsInRow rowIndices
+
+
+viewRow : List Cell -> Html Msg
+viewRow row =
+    List.map viewCell row |> tr []
+
+
+viewCell : Cell -> Html Msg
+viewCell cell =
+    td [] [ text (cellOwnerString cell.owner) ]
+
+
+cellOwnerString : Maybe Player -> String
+cellOwnerString owner =
+    case owner of
+        Just player ->
+            case player of
+                X ->
+                    "✕"
+
+                O ->
+                    "●"
+
+        Nothing ->
+            ""
 
 
 
