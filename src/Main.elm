@@ -38,7 +38,7 @@ type alias Board =
 
 type alias Model =
     { board : Board
-    , currentTurn : Player
+    , currentPlayer : Player
     , gameStatus : GameStatus
     }
 
@@ -46,7 +46,7 @@ type alias Model =
 init : ( Model, Cmd Msg )
 init =
     { board = initBoard
-    , currentTurn = O
+    , currentPlayer = O
     , gameStatus = NotStarted
     }
         ! []
@@ -93,10 +93,10 @@ update msg model =
             case model.gameStatus of
                 InProgress ->
                     let
-                        ( newBoard, nextTurn ) =
-                            ownCell cell model.currentTurn model.board
+                        ( newBoard, nextPlayer ) =
+                            ownCell cell model.currentPlayer model.board
                     in
-                        { model | board = newBoard, currentTurn = nextTurn } ! []
+                        { model | board = newBoard, currentPlayer = nextPlayer } ! []
 
                 _ ->
                     model ! []
@@ -112,13 +112,13 @@ ownCell cell currentPlayer board =
                 else
                     cell_
         in
-            ( List.map updateCell board, flipTurn currentPlayer )
+            ( List.map updateCell board, flipPlayer currentPlayer )
     else
         ( board, currentPlayer )
 
 
-flipTurn : Player -> Player
-flipTurn currentPlayer =
+flipPlayer : Player -> Player
+flipPlayer currentPlayer =
     case currentPlayer of
         X ->
             O
@@ -161,16 +161,16 @@ viewBoardHeader model =
         view_ =
             case model.gameStatus of
                 InProgress ->
-                    viewCurrentTurn model.currentTurn
+                    viewCurrentPlayer model.currentPlayer
 
                 Drawn ->
-                    Html.text "Drawn"
+                    text "Drawn"
 
                 WonBy player ->
-                    Html.text ("Won by " ++ toString player)
+                    text ("Won by " ++ toString player)
 
                 NotStarted ->
-                    Html.text ""
+                    text ""
     in
         p [ class "boardHeader" ]
             [ view_ ]
@@ -223,8 +223,8 @@ cellOwnerString owner =
             ""
 
 
-viewCurrentTurn : Player -> Html Msg
-viewCurrentTurn player =
+viewCurrentPlayer : Player -> Html Msg
+viewCurrentPlayer player =
     span [ class "topLine" ]
         [ span [ class (playerCssClass (Just player)) ]
             [ text (playerName player) ]
@@ -256,7 +256,7 @@ startButton : GameStatus -> Html Msg
 startButton gameStatus =
     case gameStatus of
         InProgress ->
-            Html.text ""
+            text ""
 
         _ ->
             button [ onClick NewGame ] [ text "Start New Game" ]
