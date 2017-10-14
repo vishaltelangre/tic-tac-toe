@@ -151,8 +151,8 @@ determineGameStatus model =
             flipPlayer model.currentPlayer
 
         cellsAndOwners =
-            winningMoves
-                |> List.map (List.map <| cellOwnerAtLocation model.board)
+            possibleWinningLines
+                |> List.map (List.map <| cellAndOwnerAtLocation model.board)
 
         hasUnownedCells =
             cellsAndOwners
@@ -210,8 +210,8 @@ determineGameStatus model =
         }
 
 
-winningMoves : List (List CellLocation)
-winningMoves =
+possibleWinningLines : List (List CellLocation)
+possibleWinningLines =
     [ [ CellLocation 0 0, CellLocation 0 1, CellLocation 0 2 ]
     , [ CellLocation 1 0, CellLocation 1 1, CellLocation 1 2 ]
     , [ CellLocation 2 0, CellLocation 2 1, CellLocation 2 2 ]
@@ -223,8 +223,8 @@ winningMoves =
     ]
 
 
-cellOwnerAtLocation : Board -> CellLocation -> ( Maybe Cell, Maybe Player )
-cellOwnerAtLocation board location =
+cellAndOwnerAtLocation : Board -> CellLocation -> ( Maybe Cell, Maybe Player )
+cellAndOwnerAtLocation board location =
     case (cellAtLocation board location) of
         Just cell ->
             ( Just cell, cell.owner )
@@ -238,6 +238,11 @@ cellAtLocation board location =
     board
         |> List.filter (\cell -> cell.location == location)
         |> List.head
+
+
+numberOfRows : Board -> Int
+numberOfRows board =
+    List.length board |> toFloat |> sqrt |> round
 
 
 
@@ -256,6 +261,18 @@ view model =
 viewBoard : Board -> Html Msg
 viewBoard board =
     board |> board2D |> List.map viewRow |> table []
+
+
+board2D : Board -> List (List Cell)
+board2D board =
+    let
+        rowIndices =
+            List.range 0 ((numberOfRows board) - 1)
+
+        cellsInRow row =
+            List.filter (\cell -> row == cell.location.row) board
+    in
+        List.map cellsInRow rowIndices
 
 
 viewBoardHeader : Model -> Html Msg
@@ -297,23 +314,6 @@ viewPlayer player =
 viewBoardFooter : Model -> Html Msg
 viewBoardFooter model =
     p [ class "boardFooter" ] [ buttonNewGame model.gameStatus ]
-
-
-board2D : Board -> List (List Cell)
-board2D board =
-    let
-        rowIndices =
-            List.range 0 ((numberOfRows board) - 1)
-
-        cellsInRow row =
-            List.filter (\cell -> row == cell.location.row) board
-    in
-        List.map cellsInRow rowIndices
-
-
-numberOfRows : Board -> Int
-numberOfRows board =
-    List.length board |> toFloat |> sqrt |> round
 
 
 viewRow : List Cell -> Html Msg

@@ -30,12 +30,12 @@ td {
   border: 1px solid #000;
   width: 100px;
   height: 100px;
-  background: rgba(10, 10, 10, 1);
+  background: rgba(0, 0, 0, 1);
   border-radius: 10px;
 }
 
 td:hover {
-  background: rgba(0, 0, 0, 1);
+  background: rgba(10, 10, 10, 1);
   border-color: #111;
   cursor: pointer;
 }
