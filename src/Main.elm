@@ -109,7 +109,23 @@ viewBoard board =
 
 viewBoardHeader : Model -> Html Msg
 viewBoardHeader model =
-    p [ class "boardHeader" ] [ viewCurrentTurn model.currentTurn ]
+    let
+        view_ =
+            case model.gameStatus of
+                InProgress ->
+                    viewCurrentTurn model.currentTurn
+
+                Drawn ->
+                    Html.text "Drawn"
+
+                WonBy player ->
+                    Html.text ("Won by " ++ toString player)
+
+                NotStarted ->
+                    Html.text ""
+    in
+        p [ class "boardHeader" ]
+            [ view_ ]
 
 
 viewBoardFooter : Model -> Html Msg
@@ -142,7 +158,8 @@ viewRow row =
 
 viewCell : Cell -> Html Msg
 viewCell cell =
-    td [] [ text (cellOwnerString cell.owner) ]
+    td [ class ("player" ++ toString cell.owner) ]
+        [ text (cellOwnerString cell.owner) ]
 
 
 cellOwnerString : Maybe Player -> String
