@@ -3,7 +3,7 @@ body {
   font-size: 14px;
   margin: 0;
   color: #fff;
-  background: #111;
+  background: rgba(20, 20, 20, 1);
 }
 
 #root {
@@ -27,14 +27,17 @@ table {
 }
 
 td {
-  border: 1px solid #111;
+  border: 1px solid #000;
   width: 100px;
   height: 100px;
-  background: #000;
+  background: rgba(10, 10, 10, 1);
+  border-radius: 10px;
 }
 
 td:hover {
-  border-color: #fff;
+  background: rgba(0, 0, 0, 1);
+  border-color: #111;
+  cursor: pointer;
 }
 
 .boardHeader, .boardFooter {
@@ -45,6 +48,11 @@ span.player {
   font-size: 30px;
   font-weight: 400;
   vertical-align: middle;
+}
+
+td.player {
+  text-align: center;
+font-size: 75px;
 }
 
 .playerX {

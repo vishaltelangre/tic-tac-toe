@@ -76,6 +76,7 @@ initBoard =
 
 type Msg
     = NewGame
+    | OwnCell CellLocation
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -87,6 +88,27 @@ update msg model =
                     init
             in
                 { newModel | gameStatus = InProgress } ! [ cmd ]
+
+        OwnCell cellLocation ->
+            case model.gameStatus of
+                InProgress ->
+                    { model | board = ownCell cellLocation model.currentTurn model.board }
+                        ! []
+
+                _ ->
+                    model ! []
+
+
+ownCell : CellLocation -> Player -> Board -> Board
+ownCell cellLocation currentPlayer board =
+    let
+        updateCell cell =
+            if cell.location == cellLocation then
+                { cell | owner = Just currentPlayer }
+            else
+                cell
+    in
+        List.map updateCell board
 
 
 
@@ -158,7 +180,10 @@ viewRow row =
 
 viewCell : Cell -> Html Msg
 viewCell cell =
-    td [ class ("player" ++ toString cell.owner) ]
+    td
+        [ class (playerCssClass cell.owner)
+        , onClick (OwnCell cell.location)
+        ]
         [ text (cellOwnerString cell.owner) ]
 
 
@@ -175,7 +200,7 @@ cellOwnerString owner =
 viewCurrentTurn : Player -> Html Msg
 viewCurrentTurn player =
     span [ class "topLine" ]
-        [ span [ class ("player player" ++ toString player) ]
+        [ span [ class (playerCssClass (Just player)) ]
             [ text (playerName player) ]
         , text "'s turn!"
         ]
@@ -189,6 +214,16 @@ playerName player =
 
         O ->
             "●"
+
+
+playerCssClass : Maybe Player -> String
+playerCssClass player =
+    case player of
+        Just player_ ->
+            "player player" ++ toString player_
+
+        Nothing ->
+            ""
 
 
 startButton : GameStatus -> Html Msg
