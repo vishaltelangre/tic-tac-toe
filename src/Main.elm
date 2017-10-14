@@ -1,6 +1,8 @@
 module Main exposing (..)
 
-import Html exposing (Html, text, div, table, tr, td)
+import Html exposing (Html, text, div, table, tr, td, button, span, p)
+import Html.Attributes exposing (class, href)
+import Html.Events exposing (onClick)
 
 
 ---- MODEL ----
@@ -44,7 +46,7 @@ type alias Model =
 init : ( Model, Cmd Msg )
 init =
     { board = initBoard
-    , currentTurn = X
+    , currentTurn = O
     , gameStatus = NotStarted
     }
         ! []
@@ -73,12 +75,18 @@ initBoard =
 
 
 type Msg
-    = NoOp
+    = NewGame
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    model ! []
+    case msg of
+        NewGame ->
+            let
+                ( newModel, cmd ) =
+                    init
+            in
+                { newModel | gameStatus = InProgress } ! [ cmd ]
 
 
 
@@ -88,13 +96,25 @@ update msg model =
 view : Model -> Html Msg
 view model =
     div []
-        [ table [] [ viewBoard model.board ]
+        [ viewBoardHeader model
+        , viewBoard model.board
+        , viewBoardFooter model
         ]
 
 
 viewBoard : Board -> Html Msg
 viewBoard board =
     board |> board2D |> List.map viewRow |> table []
+
+
+viewBoardHeader : Model -> Html Msg
+viewBoardHeader model =
+    p [ class "boardHeader" ] [ viewCurrentTurn model.currentTurn ]
+
+
+viewBoardFooter : Model -> Html Msg
+viewBoardFooter model =
+    p [ class "boardFooter" ] [ startButton model.gameStatus ]
 
 
 board2D : Board -> List (List Cell)
@@ -129,15 +149,39 @@ cellOwnerString : Maybe Player -> String
 cellOwnerString owner =
     case owner of
         Just player ->
-            case player of
-                X ->
-                    "✕"
-
-                O ->
-                    "●"
+            playerName player
 
         Nothing ->
             ""
+
+
+viewCurrentTurn : Player -> Html Msg
+viewCurrentTurn player =
+    span [ class "topLine" ]
+        [ span [ class ("player player" ++ toString player) ]
+            [ text (playerName player) ]
+        , text "'s turn!"
+        ]
+
+
+playerName : Player -> String
+playerName player =
+    case player of
+        X ->
+            "✕"
+
+        O ->
+            "●"
+
+
+startButton : GameStatus -> Html Msg
+startButton gameStatus =
+    case gameStatus of
+        InProgress ->
+            Html.text ""
+
+        _ ->
+            button [ onClick NewGame ] [ text "Start New Game" ]
 
 
 

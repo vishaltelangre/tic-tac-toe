@@ -14,7 +14,7 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  margin: auto;
+  margin: 5% auto;
 }
 
 td, tr, table {
@@ -35,4 +35,22 @@ td {
 
 td:hover {
   border-color: #fff;
+}
+
+.boardHeader, .boardFooter {
+  text-align: center;
+}
+
+span.player {
+  font-size: 30px;
+  font-weight: 400;
+  vertical-align: middle;
+}
+
+.playerX {
+  color: #f00;
+}
+
+.playerO {
+  color: #ff0;
 }
