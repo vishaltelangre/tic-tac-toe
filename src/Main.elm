@@ -101,7 +101,7 @@ update msg model =
                                 , currentPlayer = nextPlayer
                             }
                     in
-                        determineGameStatus updatedModel ! []
+                        updateGameStatus updatedModel ! []
 
                 _ ->
                     model ! []
@@ -109,17 +109,19 @@ update msg model =
 
 ownCell : Cell -> Player -> Board -> ( Board, Player )
 ownCell cell currentPlayer board =
-    if canOwnCell cell currentPlayer then
-        let
-            updateCell cell_ =
-                if (locationOfCell cell) == (locationOfCell cell_) then
-                    OwnedBy (locationOfCell cell) currentPlayer
-                else
-                    cell_
-        in
-            ( List.map updateCell board, flipPlayer currentPlayer )
-    else
-        ( board, currentPlayer )
+    case cell of
+        NotOwned _ ->
+            let
+                updateCell cell_ =
+                    if (locationOfCell cell) == (locationOfCell cell_) then
+                        OwnedBy (locationOfCell cell) currentPlayer
+                    else
+                        cell_
+            in
+                ( List.map updateCell board, flipPlayer currentPlayer )
+
+        _ ->
+            ( board, currentPlayer )
 
 
 flipPlayer : Player -> Player
@@ -132,18 +134,8 @@ flipPlayer currentPlayer =
             X
 
 
-canOwnCell : Cell -> Player -> Bool
-canOwnCell cell currentPlayer =
-    case cell of
-        NotOwned _ ->
-            True
-
-        _ ->
-            False
-
-
-determineGameStatus : Model -> Model
-determineGameStatus model =
+updateGameStatus : Model -> Model
+updateGameStatus model =
     let
         opponent =
             flipPlayer model.currentPlayer

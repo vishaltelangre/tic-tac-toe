@@ -10,6 +10,8 @@ Play online at https://vishaltelangre.com/tic-tac-toe.
 ### To run locally
 
 ```
+npm install create-elm-app -g
+
 elm-app start
 ```
 
