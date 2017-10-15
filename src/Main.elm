@@ -148,53 +148,66 @@ determineGameStatus model =
         opponent =
             flipPlayer model.currentPlayer
 
-        cells =
-            possibleWinningLines
-                |> List.map (List.map (cellAndOwnerAtLocation model.board))
+        cellsAndOwners =
+            cellAndOwnerAtPossibleWinningLines model.board
 
         hasNotOwnedCells =
-            cells
+            cellsAndOwners
                 |> List.concat
                 |> List.map Tuple.second
                 |> List.member Nothing
 
+        updatedStatus =
+            if isPlayerWinner model.currentPlayer model.board then
+                WonBy model.currentPlayer
+            else if isPlayerWinner opponent model.board then
+                WonBy opponent
+            else if hasNotOwnedCells then
+                model.gameStatus
+            else
+                Drawn
+    in
+        { model | gameStatus = updatedStatus }
+
+
+winningCellsOfWinner : Model -> List Cell
+winningCellsOfWinner model =
+    case model.gameStatus of
+        WonBy winner ->
+            matchingWinnerLinesForPlayer winner model.board
+                |> List.concat
+                |> List.map Tuple.first
+                |> List.filterMap identity
+
+        _ ->
+            []
+
+
+isPlayerWinner : Player -> Board -> Bool
+isPlayerWinner player board =
+    matchingWinnerLinesForPlayer player board
+        |> List.isEmpty
+        |> not
+
+
+cellAndOwnerAtPossibleWinningLines : Board -> List (List ( Maybe Cell, Maybe Player ))
+cellAndOwnerAtPossibleWinningLines board =
+    possibleWinningLines |> List.map (List.map <| cellAndOwnerAtLocation board)
+
+
+matchingWinnerLinesForPlayer : Player -> Board -> List (List ( Maybe Cell, Maybe Player ))
+matchingWinnerLinesForPlayer player board =
+    let
+        cellsAndOwners =
+            cellAndOwnerAtPossibleWinningLines board
+
         expectedWinnerLine player =
-            Just player |> List.repeat (numberOfRows model.board)
+            Just player |> List.repeat (numberOfRows board)
 
         matchesWinnerLine player line =
             expectedWinnerLine player == List.map Tuple.second line
-
-        matchingWinnerLinesForPlayer player =
-            cells
-                |> List.filter (matchesWinnerLine player)
-
-        winningCells player =
-            matchingWinnerLinesForPlayer player
-                |> List.concat
-                |> List.map Tuple.first
-
-        isWinner player =
-            matchingWinnerLinesForPlayer player
-                |> List.isEmpty
-                |> not
-
-        updatedStatusAndWinningCells =
-            if isWinner model.currentPlayer then
-                ( WonBy model.currentPlayer, winningCells model.currentPlayer )
-            else if isWinner opponent then
-                ( WonBy opponent, winningCells opponent )
-            else if hasNotOwnedCells then
-                ( model.gameStatus, [] )
-            else
-                ( Drawn, [] )
-
-        updatedStatus =
-            Tuple.first updatedStatusAndWinningCells
-
-        winningCellsToHighlight =
-            Tuple.second updatedStatusAndWinningCells
     in
-        { model | gameStatus = updatedStatus }
+        cellsAndOwners |> List.filter (matchesWinnerLine player)
 
 
 possibleWinningLines : List (List CellLocation)
@@ -272,14 +285,21 @@ view : Model -> Html Msg
 view model =
     div []
         [ viewBoardHeader model
-        , viewBoard model.board
+        , viewBoard model
         , viewBoardFooter model
         ]
 
 
-viewBoard : Board -> Html Msg
-viewBoard board =
-    board |> board2D |> List.map viewRow |> table []
+viewBoard : Model -> Html Msg
+viewBoard model =
+    let
+        cellsToHighlight =
+            winningCellsOfWinner model
+    in
+        model.board
+            |> board2D
+            |> List.map (viewRow cellsToHighlight)
+            |> table []
 
 
 board2D : Board -> List (List Cell)
@@ -337,19 +357,25 @@ viewBoardFooter model =
     p [ class "boardFooter" ] [ buttonNewGame model.gameStatus ]
 
 
-viewRow : List Cell -> Html Msg
-viewRow row =
-    List.map viewCell row |> tr []
+viewRow : List Cell -> List Cell -> Html Msg
+viewRow cellsToHighlight row =
+    List.map (viewCell cellsToHighlight) row |> tr []
 
 
-viewCell : Cell -> Html Msg
-viewCell cell =
+viewCell : List Cell -> Cell -> Html Msg
+viewCell cellsToHighlight cell =
     let
         defaultClass =
             ownerOfCell cell |> playerCssClass
+
+        updatedClass =
+            if List.member cell cellsToHighlight then
+                defaultClass ++ " highlight"
+            else
+                defaultClass
     in
         td
-            [ class defaultClass
+            [ class updatedClass
             , onClick (OwnCell cell)
             ]
             [ text (ownerOfCell cell |> cellOwnerName) ]
