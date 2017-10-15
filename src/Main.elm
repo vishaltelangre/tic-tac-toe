@@ -20,11 +20,9 @@ type Player
     | O
 
 
-type alias Cell =
-    { owner : Maybe Player
-    , highlight : Bool
-    , location : CellLocation
-    }
+type Cell
+    = NotOwned CellLocation
+    | OwnedBy CellLocation Player
 
 
 type alias CellLocation =
@@ -57,7 +55,7 @@ initBoard : Board
 initBoard =
     let
         cellAt row col =
-            CellLocation row col |> Cell Nothing False
+            CellLocation row col |> NotOwned
     in
         [ cellAt 0 0
         , cellAt 0 1
@@ -114,8 +112,8 @@ ownCell cell currentPlayer board =
     if canOwnCell cell currentPlayer then
         let
             updateCell cell_ =
-                if cell.location == cell_.location then
-                    { cell_ | owner = Just currentPlayer }
+                if (locationOfCell cell) == (locationOfCell cell_) then
+                    OwnedBy (locationOfCell cell) currentPlayer
                 else
                     cell_
         in
@@ -136,12 +134,12 @@ flipPlayer currentPlayer =
 
 canOwnCell : Cell -> Player -> Bool
 canOwnCell cell currentPlayer =
-    case cell.owner of
-        Just _ ->
-            False
-
-        Nothing ->
+    case cell of
+        NotOwned _ ->
             True
+
+        _ ->
+            False
 
 
 determineGameStatus : Model -> Model
@@ -150,12 +148,12 @@ determineGameStatus model =
         opponent =
             flipPlayer model.currentPlayer
 
-        cellsAndOwners =
+        cells =
             possibleWinningLines
-                |> List.map (List.map <| cellAndOwnerAtLocation model.board)
+                |> List.map (List.map (cellAndOwnerAtLocation model.board))
 
-        hasUnownedCells =
-            cellsAndOwners
+        hasNotOwnedCells =
+            cells
                 |> List.concat
                 |> List.map Tuple.second
                 |> List.member Nothing
@@ -167,7 +165,7 @@ determineGameStatus model =
             expectedWinnerLine player == List.map Tuple.second line
 
         matchingWinnerLinesForPlayer player =
-            cellsAndOwners
+            cells
                 |> List.filter (matchesWinnerLine player)
 
         winningCells player =
@@ -185,7 +183,7 @@ determineGameStatus model =
                 ( WonBy model.currentPlayer, winningCells model.currentPlayer )
             else if isWinner opponent then
                 ( WonBy opponent, winningCells opponent )
-            else if hasUnownedCells then
+            else if hasNotOwnedCells then
                 ( model.gameStatus, [] )
             else
                 ( Drawn, [] )
@@ -195,19 +193,8 @@ determineGameStatus model =
 
         winningCellsToHighlight =
             Tuple.second updatedStatusAndWinningCells
-
-        highlightWinningBoardCell boardCell =
-            { boardCell
-                | highlight = List.member (Just boardCell) winningCellsToHighlight
-            }
-
-        updatedBoard =
-            model.board |> List.map highlightWinningBoardCell
     in
-        { model
-            | gameStatus = updatedStatus
-            , board = updatedBoard
-        }
+        { model | gameStatus = updatedStatus }
 
 
 possibleWinningLines : List (List CellLocation)
@@ -225,9 +212,14 @@ possibleWinningLines =
 
 cellAndOwnerAtLocation : Board -> CellLocation -> ( Maybe Cell, Maybe Player )
 cellAndOwnerAtLocation board location =
-    case (cellAtLocation board location) of
+    case cellAtLocation board location of
         Just cell ->
-            ( Just cell, cell.owner )
+            case cell of
+                NotOwned _ ->
+                    ( Just cell, Nothing )
+
+                OwnedBy _ player ->
+                    ( Just cell, Just player )
 
         Nothing ->
             ( Nothing, Nothing )
@@ -235,14 +227,41 @@ cellAndOwnerAtLocation board location =
 
 cellAtLocation : Board -> CellLocation -> Maybe Cell
 cellAtLocation board location =
-    board
-        |> List.filter (\cell -> cell.location == location)
-        |> List.head
+    let
+        cellMatchesLocation cell =
+            case cell of
+                NotOwned cellLocation ->
+                    location == cellLocation
+
+                OwnedBy cellLocation _ ->
+                    location == cellLocation
+    in
+        board |> List.filter cellMatchesLocation |> List.head
 
 
 numberOfRows : Board -> Int
 numberOfRows board =
     List.length board |> toFloat |> sqrt |> round
+
+
+locationOfCell : Cell -> CellLocation
+locationOfCell cell =
+    case cell of
+        NotOwned location ->
+            location
+
+        OwnedBy location _ ->
+            location
+
+
+ownerOfCell : Cell -> Maybe Player
+ownerOfCell cell =
+    case cell of
+        OwnedBy _ player ->
+            Just player
+
+        _ ->
+            Nothing
 
 
 
@@ -269,8 +288,10 @@ board2D board =
         rowIndices =
             List.range 0 ((numberOfRows board) - 1)
 
-        cellsInRow row =
-            List.filter (\cell -> row == cell.location.row) board
+        cellsInRow rowIndex =
+            board
+                |> List.filter
+                    (\cell -> rowIndex == (cell |> locationOfCell |> .row))
     in
         List.map cellsInRow rowIndices
 
@@ -325,19 +346,13 @@ viewCell : Cell -> Html Msg
 viewCell cell =
     let
         defaultClass =
-            playerCssClass cell.owner
-
-        updatedClass =
-            if cell.highlight then
-                defaultClass ++ " highlight"
-            else
-                defaultClass
+            ownerOfCell cell |> playerCssClass
     in
         td
-            [ class updatedClass
+            [ class defaultClass
             , onClick (OwnCell cell)
             ]
-            [ text (cellOwnerName cell.owner) ]
+            [ text (ownerOfCell cell |> cellOwnerName) ]
 
 
 cellOwnerName : Maybe Player -> String
