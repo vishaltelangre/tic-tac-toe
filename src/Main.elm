@@ -1,5 +1,6 @@
 module Main exposing (..)
 
+import Dict exposing (Dict)
 import Html exposing (Html, text, div, table, tr, td, button, span, p)
 import Html.Attributes exposing (class, href)
 import Html.Events exposing (onClick)
@@ -20,19 +21,12 @@ type Player
     | O
 
 
-type Cell
-    = NotOwned CellLocation
-    | OwnedBy CellLocation Player
-
-
-type alias CellLocation =
-    { row : Int
-    , column : Int
-    }
+type alias Position =
+    Int
 
 
 type alias Board =
-    List Cell
+    Dict Position (Maybe Player)
 
 
 type alias Model =
@@ -54,19 +48,30 @@ init =
 initBoard : Board
 initBoard =
     let
-        cellAt row col =
-            CellLocation row col |> NotOwned
+        addNotOwnedPosition position dict =
+            Dict.insert position Nothing dict
     in
-        [ cellAt 0 0
-        , cellAt 0 1
-        , cellAt 0 2
-        , cellAt 1 0
-        , cellAt 1 1
-        , cellAt 1 2
-        , cellAt 2 0
-        , cellAt 2 1
-        , cellAt 2 2
-        ]
+        positions2D
+            |> List.concat
+            |> List.foldl addNotOwnedPosition Dict.empty
+
+
+positions2D : List (List Position)
+positions2D =
+    [ [ 0, 1, 2 ], [ 3, 4, 5 ], [ 6, 7, 8 ] ]
+
+
+possibleWinningPositionLines : List (List Position)
+possibleWinningPositionLines =
+    [ [ 0, 1, 2 ]
+    , [ 3, 4, 5 ]
+    , [ 6, 7, 8 ]
+    , [ 0, 3, 6 ]
+    , [ 1, 4, 7 ]
+    , [ 2, 5, 8 ]
+    , [ 0, 4, 8 ]
+    , [ 2, 4, 6 ]
+    ]
 
 
 
@@ -75,7 +80,7 @@ initBoard =
 
 type Msg
     = NewGame
-    | OwnCell Cell
+    | OwnPosition Position
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -88,45 +93,38 @@ update msg model =
             in
                 { newModel | gameStatus = InProgress } ! [ cmd ]
 
-        OwnCell cell ->
+        OwnPosition position ->
             case model.gameStatus of
                 InProgress ->
-                    let
-                        ( newBoard, nextPlayer ) =
-                            ownCell cell model.currentPlayer model.board
-
-                        updatedModel =
-                            { model
-                                | board = newBoard
-                                , currentPlayer = nextPlayer
-                            }
-                    in
-                        updateGameStatus updatedModel ! []
+                    (ownPosition position model |> updateGameStatus) ! []
 
                 _ ->
                     model ! []
 
 
-ownCell : Cell -> Player -> Board -> ( Board, Player )
-ownCell cell currentPlayer board =
-    case cell of
-        NotOwned _ ->
+ownPosition : Position -> Model -> Model
+ownPosition position ({ currentPlayer, board } as model) =
+    case Dict.get position board of
+        Just Nothing ->
             let
-                updateCell cell_ =
-                    if (locationOfCell cell) == (locationOfCell cell_) then
-                        OwnedBy (locationOfCell cell) currentPlayer
-                    else
-                        cell_
+                ownerInBoard _ =
+                    Just (Just currentPlayer)
+
+                updatedBoard =
+                    Dict.update position ownerInBoard board
             in
-                ( List.map updateCell board, flipPlayer currentPlayer )
+                { model
+                    | board = updatedBoard
+                    , currentPlayer = (flipPlayer currentPlayer)
+                }
 
         _ ->
-            ( board, currentPlayer )
+            model
 
 
 flipPlayer : Player -> Player
-flipPlayer currentPlayer =
-    case currentPlayer of
+flipPlayer player =
+    case player of
         X ->
             O
 
@@ -135,24 +133,24 @@ flipPlayer currentPlayer =
 
 
 updateGameStatus : Model -> Model
-updateGameStatus model =
+updateGameStatus ({ currentPlayer, board } as model) =
     let
         opponent =
-            flipPlayer model.currentPlayer
+            flipPlayer currentPlayer
 
-        cellsAndOwners =
-            cellAndOwnerAtPossibleWinningLines model.board
+        positionsAndOwners =
+            positionAndOwnerAtPossibleWinningLines board
 
         hasNotOwnedCells =
-            cellsAndOwners
+            positionsAndOwners
                 |> List.concat
                 |> List.map Tuple.second
                 |> List.member Nothing
 
         updatedStatus =
-            if isPlayerWinner model.currentPlayer model.board then
-                WonBy model.currentPlayer
-            else if isPlayerWinner opponent model.board then
+            if isPlayerWinner currentPlayer board then
+                WonBy currentPlayer
+            else if isPlayerWinner opponent board then
                 WonBy opponent
             else if hasNotOwnedCells then
                 model.gameStatus
@@ -162,14 +160,14 @@ updateGameStatus model =
         { model | gameStatus = updatedStatus }
 
 
-winningCellsOfWinner : Model -> List Cell
-winningCellsOfWinner model =
-    case model.gameStatus of
+winningPositionsOfWinner : Model -> List Position
+winningPositionsOfWinner { gameStatus, board } =
+    case gameStatus of
         WonBy winner ->
-            matchingWinnerLinesForPlayer winner model.board
+            matchingWinnerLinesForPlayer winner board
                 |> List.concat
                 |> List.map Tuple.first
-                |> List.filterMap identity
+                |> List.map identity
 
         _ ->
             []
@@ -182,87 +180,34 @@ isPlayerWinner player board =
         |> not
 
 
-cellAndOwnerAtPossibleWinningLines : Board -> List (List ( Maybe Cell, Maybe Player ))
-cellAndOwnerAtPossibleWinningLines board =
-    possibleWinningLines |> List.map (List.map <| cellAndOwnerAtLocation board)
+positionAndOwnerAtPossibleWinningLines : Board -> List (List ( Position, Maybe Player ))
+positionAndOwnerAtPossibleWinningLines board =
+    let
+        positionAndOwnAt position =
+            ( position, ownerAtPosition position board )
+    in
+        possibleWinningPositionLines |> List.map (List.map <| positionAndOwnAt)
 
 
-matchingWinnerLinesForPlayer : Player -> Board -> List (List ( Maybe Cell, Maybe Player ))
+matchingWinnerLinesForPlayer : Player -> Board -> List (List ( Position, Maybe Player ))
 matchingWinnerLinesForPlayer player board =
     let
-        cellsAndOwners =
-            cellAndOwnerAtPossibleWinningLines board
+        positionsAndOwners =
+            positionAndOwnerAtPossibleWinningLines board
 
         expectedWinnerLine player =
-            Just player |> List.repeat (numberOfRows board)
+            Just player |> List.repeat (List.length positions2D)
 
         matchesWinnerLine player line =
             expectedWinnerLine player == List.map Tuple.second line
     in
-        cellsAndOwners |> List.filter (matchesWinnerLine player)
+        positionsAndOwners |> List.filter (matchesWinnerLine player)
 
 
-possibleWinningLines : List (List CellLocation)
-possibleWinningLines =
-    [ [ CellLocation 0 0, CellLocation 0 1, CellLocation 0 2 ]
-    , [ CellLocation 1 0, CellLocation 1 1, CellLocation 1 2 ]
-    , [ CellLocation 2 0, CellLocation 2 1, CellLocation 2 2 ]
-    , [ CellLocation 0 0, CellLocation 1 0, CellLocation 2 0 ]
-    , [ CellLocation 0 1, CellLocation 1 1, CellLocation 2 1 ]
-    , [ CellLocation 0 2, CellLocation 1 2, CellLocation 2 2 ]
-    , [ CellLocation 0 0, CellLocation 1 1, CellLocation 2 2 ]
-    , [ CellLocation 0 2, CellLocation 1 1, CellLocation 2 0 ]
-    ]
-
-
-cellAndOwnerAtLocation : Board -> CellLocation -> ( Maybe Cell, Maybe Player )
-cellAndOwnerAtLocation board location =
-    case cellAtLocation board location of
-        Just cell ->
-            case cell of
-                NotOwned _ ->
-                    ( Just cell, Nothing )
-
-                OwnedBy _ player ->
-                    ( Just cell, Just player )
-
-        Nothing ->
-            ( Nothing, Nothing )
-
-
-cellAtLocation : Board -> CellLocation -> Maybe Cell
-cellAtLocation board location =
-    let
-        cellMatchesLocation cell =
-            case cell of
-                NotOwned cellLocation ->
-                    location == cellLocation
-
-                OwnedBy cellLocation _ ->
-                    location == cellLocation
-    in
-        board |> List.filter cellMatchesLocation |> List.head
-
-
-numberOfRows : Board -> Int
-numberOfRows board =
-    List.length board |> toFloat |> sqrt |> round
-
-
-locationOfCell : Cell -> CellLocation
-locationOfCell cell =
-    case cell of
-        NotOwned location ->
-            location
-
-        OwnedBy location _ ->
-            location
-
-
-ownerOfCell : Cell -> Maybe Player
-ownerOfCell cell =
-    case cell of
-        OwnedBy _ player ->
+ownerAtPosition : Position -> Board -> Maybe Player
+ownerAtPosition position board =
+    case Dict.get position board of
+        Just (Just player) ->
             Just player
 
         _ ->
@@ -285,38 +230,33 @@ view model =
 viewBoard : Model -> Html Msg
 viewBoard model =
     let
-        cellsToHighlight =
-            winningCellsOfWinner model
+        positionsToHighlight =
+            winningPositionsOfWinner model
     in
         model.board
             |> board2D
-            |> List.map (viewRow cellsToHighlight)
+            |> List.map (viewRow positionsToHighlight)
             |> table []
 
 
-board2D : Board -> List (List Cell)
+board2D : Board -> List (List ( Position, Maybe Player ))
 board2D board =
     let
-        rowIndices =
-            List.range 0 ((numberOfRows board) - 1)
-
-        cellsInRow rowIndex =
-            board
-                |> List.filter
-                    (\cell -> rowIndex == (cell |> locationOfCell |> .row))
+        positionAndOwnerAt position =
+            ( position, ownerAtPosition position board )
     in
-        List.map cellsInRow rowIndices
+        positions2D |> List.map (List.map positionAndOwnerAt)
 
 
 viewBoardHeader : Model -> Html Msg
-viewBoardHeader model =
+viewBoardHeader { currentPlayer, gameStatus } =
     let
         view_ =
-            case model.gameStatus of
+            case gameStatus of
                 InProgress ->
                     span []
                         [ text "Turn of "
-                        , viewPlayer model.currentPlayer
+                        , viewPlayer currentPlayer
                         , text " player!"
                         ]
 
@@ -341,63 +281,53 @@ viewPlayer : Player -> Html Msg
 viewPlayer player =
     span
         [ class (playerCssClass (Just player)) ]
-        [ text (playerName player) ]
+        [ text (toString player) ]
 
 
 viewBoardFooter : Model -> Html Msg
-viewBoardFooter model =
-    p [ class "boardFooter" ] [ buttonNewGame model.gameStatus ]
+viewBoardFooter { gameStatus } =
+    p [ class "boardFooter" ] [ buttonNewGame gameStatus ]
 
 
-viewRow : List Cell -> List Cell -> Html Msg
-viewRow cellsToHighlight row =
-    List.map (viewCell cellsToHighlight) row |> tr []
+viewRow : List Position -> List ( Position, Maybe Player ) -> Html Msg
+viewRow positionsToHighlight row =
+    List.map (viewPosition positionsToHighlight) row |> tr []
 
 
-viewCell : List Cell -> Cell -> Html Msg
-viewCell cellsToHighlight cell =
+viewPosition : List Position -> ( Position, Maybe Player ) -> Html Msg
+viewPosition positionsToHighlight ( position, owner ) =
     let
         defaultClass =
-            ownerOfCell cell |> playerCssClass
+            playerCssClass owner
 
         updatedClass =
-            if List.member cell cellsToHighlight then
+            if List.member position positionsToHighlight then
                 defaultClass ++ " highlight"
             else
                 defaultClass
     in
         td
             [ class updatedClass
-            , onClick (OwnCell cell)
+            , onClick (OwnPosition position)
             ]
-            [ text (ownerOfCell cell |> cellOwnerName) ]
+            [ text (ownerName owner) ]
 
 
-cellOwnerName : Maybe Player -> String
-cellOwnerName owner =
+ownerName : Maybe Player -> String
+ownerName owner =
     case owner of
         Just player ->
-            playerName player
+            toString player
 
         Nothing ->
             ""
 
 
-playerName : Player -> String
-playerName player =
-    case player of
-        X ->
-            "X"
-
-        O ->
-            "O"
-
-
 playerCssClass : Maybe Player -> String
-playerCssClass player =
-    case player of
-        Just player_ ->
-            "player player" ++ playerName player_
+playerCssClass maybePlayer =
+    case maybePlayer of
+        Just player ->
+            "player player" ++ toString player
 
         Nothing ->
             ""
