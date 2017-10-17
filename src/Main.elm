@@ -4,6 +4,7 @@ import Dict exposing (Dict)
 import Html exposing (Html, text, div, table, tr, td, button, span, p)
 import Html.Attributes exposing (class, href)
 import Html.Events exposing (onClick)
+import Random
 
 
 ---- MODEL ----
@@ -42,7 +43,7 @@ init =
     , currentPlayer = O
     , gameStatus = NotStarted
     }
-        ! []
+        ! [ Random.generate SetInitialPlayer randomPlayer ]
 
 
 initBoard : Board
@@ -74,12 +75,35 @@ possibleWinningPositionLines =
     ]
 
 
+randomPlayer : Random.Generator Player
+randomPlayer =
+    Random.bool
+        |> Random.map
+            (\randomBool ->
+                if randomBool then
+                    X
+                else
+                    O
+            )
+
+
+opponentPlayer : Player -> Player
+opponentPlayer player =
+    case player of
+        X ->
+            O
+
+        O ->
+            X
+
+
 
 ---- UPDATE ----
 
 
 type Msg
     = NewGame
+    | SetInitialPlayer Player
     | OwnPosition Position
 
 
@@ -92,6 +116,9 @@ update msg model =
                     init
             in
                 { newModel | gameStatus = InProgress } ! [ cmd ]
+
+        SetInitialPlayer player ->
+            { model | currentPlayer = player } ! []
 
         OwnPosition position ->
             case model.gameStatus of
@@ -115,28 +142,18 @@ ownPosition position ({ currentPlayer, board } as model) =
             in
                 { model
                     | board = updatedBoard
-                    , currentPlayer = (flipPlayer currentPlayer)
+                    , currentPlayer = (opponentPlayer currentPlayer)
                 }
 
         _ ->
             model
 
 
-flipPlayer : Player -> Player
-flipPlayer player =
-    case player of
-        X ->
-            O
-
-        O ->
-            X
-
-
 updateGameStatus : Model -> Model
 updateGameStatus ({ currentPlayer, board } as model) =
     let
         opponent =
-            flipPlayer currentPlayer
+            opponentPlayer currentPlayer
 
         positionsAndOwners =
             positionAndOwnerAtPossibleWinningLines board
