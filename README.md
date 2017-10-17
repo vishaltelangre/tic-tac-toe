@@ -4,7 +4,7 @@ Play online at https://vishaltelangre.com/tic-tac-toe.
 
 ### Preview
 
-![Live Demo](https://user-images.githubusercontent.com/876195/31579133-090caf58-b14d-11e7-932b-ec62c53a2269.gif)
+![Live Demo](https://user-images.githubusercontent.com/876195/31689283-8fdf9af2-b3ac-11e7-9a13-f43d0a7a7e65.gif)
 
 
 ### To run locally
