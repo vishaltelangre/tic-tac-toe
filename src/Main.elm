@@ -43,7 +43,7 @@ init =
     , currentPlayer = O
     , gameStatus = NotStarted
     }
-        ! [ Random.generate SetInitialPlayer shufflePlayer ]
+        ! [ Random.generate SetInitialPlayer randomPlayer ]
 
 
 initBoard : Board
@@ -75,16 +75,26 @@ possibleWinningPositionLines =
     ]
 
 
-shufflePlayer : Random.Generator Player
-shufflePlayer =
-    Random.map
-        (\randomBool ->
-            if randomBool then
-                X
-            else
-                O
-        )
-        Random.bool
+randomPlayer : Random.Generator Player
+randomPlayer =
+    Random.bool
+        |> Random.map
+            (\randomBool ->
+                if randomBool then
+                    X
+                else
+                    O
+            )
+
+
+opponentPlayer : Player -> Player
+opponentPlayer player =
+    case player of
+        X ->
+            O
+
+        O ->
+            X
 
 
 
@@ -132,28 +142,18 @@ ownPosition position ({ currentPlayer, board } as model) =
             in
                 { model
                     | board = updatedBoard
-                    , currentPlayer = (flipPlayer currentPlayer)
+                    , currentPlayer = (opponentPlayer currentPlayer)
                 }
 
         _ ->
             model
 
 
-flipPlayer : Player -> Player
-flipPlayer player =
-    case player of
-        X ->
-            O
-
-        O ->
-            X
-
-
 updateGameStatus : Model -> Model
 updateGameStatus ({ currentPlayer, board } as model) =
     let
         opponent =
-            flipPlayer currentPlayer
+            opponentPlayer currentPlayer
 
         positionsAndOwners =
             positionAndOwnerAtPossibleWinningLines board
