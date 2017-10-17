@@ -271,7 +271,7 @@ viewBoardHeader { currentPlayer, gameStatus } =
                         ]
 
                 NotStarted ->
-                    text ""
+                    span [ class "banner" ] [ text "Tic Tac Toe" ]
     in
         p [ class "boardHeader" ]
             [ view_ ]
