@@ -4,6 +4,7 @@ import Dict exposing (Dict)
 import Html exposing (Html, text, div, table, tr, td, button, span, p)
 import Html.Attributes exposing (class, href)
 import Html.Events exposing (onClick)
+import Random
 
 
 ---- MODEL ----
@@ -42,7 +43,7 @@ init =
     , currentPlayer = O
     , gameStatus = NotStarted
     }
-        ! []
+        ! [ Random.generate SetInitialPlayer shufflePlayer ]
 
 
 initBoard : Board
@@ -74,12 +75,25 @@ possibleWinningPositionLines =
     ]
 
 
+shufflePlayer : Random.Generator Player
+shufflePlayer =
+    Random.map
+        (\randomBool ->
+            if randomBool then
+                X
+            else
+                O
+        )
+        Random.bool
+
+
 
 ---- UPDATE ----
 
 
 type Msg
     = NewGame
+    | SetInitialPlayer Player
     | OwnPosition Position
 
 
@@ -92,6 +106,9 @@ update msg model =
                     init
             in
                 { newModel | gameStatus = InProgress } ! [ cmd ]
+
+        SetInitialPlayer player ->
+            { model | currentPlayer = player } ! []
 
         OwnPosition position ->
             case model.gameStatus of
