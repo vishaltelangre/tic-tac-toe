@@ -47,6 +47,19 @@ td:hover {
 .boardHeader, .boardFooter {
   text-align: center;
   line-height: 30px;
+  height: 30px;
+}
+
+.left {
+  float: left;
+}
+
+.right {
+  float: right;
+}
+
+.clearfix {
+  clear: both;
 }
 
 .banner {
@@ -56,10 +69,16 @@ td:hover {
   font-weight: bold;
 }
 
-span.player {
+span.player, .arrow {
   font-size: 25px;
   font-weight: 400;
   vertical-align: top;
+}
+
+.arrow {
+  font-size: 15px;
+  color: #fff;
+  margin: 0 5px 0 5px;
 }
 
 td.player {
@@ -92,4 +111,26 @@ td.highlight {
 
 .newGame:hover {
   background: rgba(5, 65, 5, 1);
+}
+
+.playerStatus {
+  opacity: 0.1;
+}
+
+.playerStatus.active {
+  opacity: 1;
+}
+
+.active > .arrow {
+  animation: blinker 1s linear infinite;
+}
+
+@keyframes blinker {
+  50% { opacity: 0; }
+}
+
+@media (max-width: 640px) {
+  img {
+    display: none;
+  }
 }

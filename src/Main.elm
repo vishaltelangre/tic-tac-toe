@@ -271,10 +271,9 @@ viewBoardHeader { currentPlayer, gameStatus } =
         view_ =
             case gameStatus of
                 InProgress ->
-                    span []
-                        [ text "Turn of "
-                        , viewPlayer currentPlayer
-                        , text " player!"
+                    div []
+                        [ viewPlayerStatus X (currentPlayer == X)
+                        , viewPlayerStatus O (currentPlayer == O)
                         ]
 
                 Drawn ->
@@ -290,7 +289,7 @@ viewBoardHeader { currentPlayer, gameStatus } =
                 NotStarted ->
                     span [ class "banner" ] [ text "Tic Tac Toe" ]
     in
-        p [ class "boardHeader" ]
+        div [ class "boardHeader" ]
             [ view_ ]
 
 
@@ -299,6 +298,37 @@ viewPlayer player =
     span
         [ class (playerCssClass (Just player)) ]
         [ text (toString player) ]
+
+
+viewPlayerStatus : Player -> Bool -> Html Msg
+viewPlayerStatus player current =
+    let
+        defaultWrapperClass =
+            case player of
+                X ->
+                    "playerStatus left"
+
+                O ->
+                    "playerStatus right"
+
+        wrapperClass =
+            if current then
+                defaultWrapperClass ++ " active"
+            else
+                defaultWrapperClass
+    in
+        case player of
+            X ->
+                span [ class wrapperClass ]
+                    [ viewPlayer player
+                    , span [ class "arrow" ] [ text "◀︎" ]
+                    ]
+
+            O ->
+                span [ class wrapperClass ]
+                    [ span [ class "arrow" ] [ text "▶" ]
+                    , viewPlayer player
+                    ]
 
 
 viewBoardFooter : Model -> Html Msg
