@@ -33,7 +33,7 @@ type alias Board =
 type alias Model =
     { board : Board
     , currentPlayer : Player
-    , computer : Maybe Player
+    , computerPlayer : Maybe Player
     , gameStatus : GameStatus
     }
 
@@ -42,21 +42,18 @@ init : ( Model, Cmd Msg )
 init =
     { board = initBoard
     , currentPlayer = O
-    , computer = Nothing
+    , computerPlayer = Nothing
     , gameStatus = NotStarted
     }
-        ! [ Random.generate SetInitialPlayer randomPlayer ]
+        ! [ Random.generate SetInitialPlayer randomPlayerGenerator ]
 
 
 initBoard : Board
 initBoard =
-    let
-        addNotOwnedPosition position dict =
-            Dict.insert position Nothing dict
-    in
-        positions2D
-            |> List.concat
-            |> List.foldl addNotOwnedPosition Dict.empty
+    positions2D
+        |> List.concat
+        |> List.foldl (\position dict -> Dict.insert position Nothing dict)
+            Dict.empty
 
 
 positions2D : List (List Position)
@@ -77,8 +74,8 @@ possibleWinningPositionLines =
     ]
 
 
-randomPlayer : Random.Generator Player
-randomPlayer =
+randomPlayerGenerator : Random.Generator Player
+randomPlayerGenerator =
     Random.bool
         |> Random.map
             (\randomBool ->
@@ -87,16 +84,6 @@ randomPlayer =
                 else
                     O
             )
-
-
-randomListGenerator : Board -> Random.Generator (List Position)
-randomListGenerator board =
-    let
-        totalNotOwnedPositions =
-            board |> notOwnedPositions |> List.length
-    in
-        Random.int 0 totalNotOwnedPositions
-            |> Random.list totalNotOwnedPositions
 
 
 opponentPlayer : Player -> Player
@@ -109,9 +96,14 @@ opponentPlayer player =
             X
 
 
+isPlayerWinner : Player -> Board -> Bool
+isPlayerWinner player board =
+    matchingWinnerLinesForPlayer player board |> List.isEmpty |> not
+
+
 isPlayerComputer : Player -> Model -> Bool
-isPlayerComputer player { computer } =
-    case computer of
+isPlayerComputer player { computerPlayer } =
+    case computerPlayer of
         Just computerPlayer ->
             player == computerPlayer
 
@@ -125,20 +117,20 @@ isPlayerComputer player { computer } =
 
 type Msg
     = NoOp
-    | TwoPlayerGame
+    | TwoPlayersGame
     | PlayWithComputer
     | SetInitialPlayer Player
-    | TryOwningPositionAsComputer (List Position)
+    | OwnPositionAsComputer (List Position)
     | OwnPosition Position
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update msg ({ currentPlayer, board, gameStatus } as model) =
     case msg of
         NoOp ->
             model ! []
 
-        TwoPlayerGame ->
+        TwoPlayersGame ->
             let
                 ( newModel, cmd ) =
                     init
@@ -150,56 +142,40 @@ update msg model =
                 ( newModel, cmd ) =
                     init
             in
-                { newModel | gameStatus = InProgress, computer = Just X } ! [ cmd ]
+                { newModel | gameStatus = InProgress, computerPlayer = Just X }
+                    ! [ cmd ]
 
         SetInitialPlayer player ->
-            { model | currentPlayer = player }
-                ! [ Random.generate TryOwningPositionAsComputer (randomListGenerator model.board) ]
-
-        TryOwningPositionAsComputer randomList ->
-            case model.gameStatus of
-                InProgress ->
-                    case randomPosition randomList (notOwnedPositions model.board) of
-                        Just position ->
-                            if isPlayerComputer model.currentPlayer model then
-                                update (OwnPosition position) model
-                            else
-                                model ! []
-
-                        Nothing ->
-                            model ! []
-
-                _ ->
-                    model ! []
+            let
+                cmd =
+                    randomListGenerator board
+                        |> Random.generate OwnPositionAsComputer
+            in
+                { model | currentPlayer = player } ! [ cmd ]
 
         OwnPosition position ->
-            case model.gameStatus of
+            case gameStatus of
                 InProgress ->
                     let
                         newModel =
-                            (ownPosition position model |> updateGameStatus)
+                            ownPosition position model |> updateGameStatus
+
+                        cmd =
+                            randomListGenerator newModel.board
+                                |> Random.generate OwnPositionAsComputer
                     in
-                        newModel
-                            ! [ Random.generate TryOwningPositionAsComputer (randomListGenerator newModel.board) ]
+                        newModel ! [ cmd ]
 
                 _ ->
                     model ! []
 
-
-randomPosition : List Position -> List Position -> Maybe Position
-randomPosition randomList positions =
-    List.map2 (,) randomList positions
-        |> List.sortBy Tuple.first
-        |> List.unzip
-        |> Tuple.second
-        |> List.head
-
-
-notOwnedPositions : Board -> List Position
-notOwnedPositions board =
-    board
-        |> Dict.filter (\_ owner -> owner == Nothing)
-        |> Dict.keys
+        OwnPositionAsComputer randomList ->
+            let
+                randomPosition =
+                    notOwnedPositions board
+                        |> randomNotOwnedPosition randomList
+            in
+                ownPositionAsComputer randomPosition model
 
 
 ownPosition : Position -> Model -> Model
@@ -222,27 +198,39 @@ ownPosition position ({ currentPlayer, board } as model) =
             model
 
 
+ownPositionAsComputer : Maybe Position -> Model -> ( Model, Cmd Msg )
+ownPositionAsComputer randomPosition ({ currentPlayer, gameStatus } as model) =
+    let
+        shouldTryOwningPosition =
+            isPlayerComputer currentPlayer model
+                && (gameStatus == InProgress)
+    in
+        case randomPosition of
+            Just position ->
+                if shouldTryOwningPosition then
+                    update (OwnPosition position) model
+                else
+                    model ! []
+
+            Nothing ->
+                model ! []
+
+
 updateGameStatus : Model -> Model
 updateGameStatus ({ currentPlayer, board } as model) =
     let
         opponent =
             opponentPlayer currentPlayer
 
-        positionsAndOwners =
-            positionAndOwnerAtPossibleWinningLines board
-
-        hasNotOwnedCells =
-            positionsAndOwners
-                |> List.concat
-                |> List.map Tuple.second
-                |> List.member Nothing
+        hasNotOwnedPositions =
+            notOwnedPositions board |> List.isEmpty |> not
 
         updatedStatus =
             if isPlayerWinner currentPlayer board then
                 WonBy currentPlayer
             else if isPlayerWinner opponent board then
                 WonBy opponent
-            else if hasNotOwnedCells then
+            else if hasNotOwnedPositions then
                 model.gameStatus
             else
                 Drawn
@@ -250,34 +238,36 @@ updateGameStatus ({ currentPlayer, board } as model) =
         { model | gameStatus = updatedStatus }
 
 
-winningPositionsOfWinner : Model -> List Position
-winningPositionsOfWinner { gameStatus, board } =
-    case gameStatus of
-        WonBy winner ->
-            matchingWinnerLinesForPlayer winner board
-                |> List.head
-                |> Maybe.withDefault []
-                |> List.map Tuple.first
-                |> List.map identity
-
-        _ ->
-            []
+randomListGenerator : Board -> Random.Generator (List Position)
+randomListGenerator board =
+    let
+        totalNotOwnedPositions =
+            board |> notOwnedPositions |> List.length
+    in
+        totalNotOwnedPositions |> Random.int 0 |> Random.list totalNotOwnedPositions
 
 
-isPlayerWinner : Player -> Board -> Bool
-isPlayerWinner player board =
-    matchingWinnerLinesForPlayer player board
-        |> List.isEmpty
-        |> not
+randomNotOwnedPosition : List Position -> List Position -> Maybe Position
+randomNotOwnedPosition randomList positions =
+    List.map2 (,) randomList positions
+        |> List.sortBy Tuple.first
+        |> List.unzip
+        |> Tuple.second
+        |> List.head
+
+
+notOwnedPositions : Board -> List Position
+notOwnedPositions board =
+    board |> Dict.filter (\_ owner -> owner == Nothing) |> Dict.keys
 
 
 positionAndOwnerAtPossibleWinningLines : Board -> List (List ( Position, Maybe Player ))
 positionAndOwnerAtPossibleWinningLines board =
     let
-        positionAndOwnAt position =
+        positionAndOwnerAt position =
             ( position, ownerAtPosition position board )
     in
-        possibleWinningPositionLines |> List.map (List.map <| positionAndOwnAt)
+        possibleWinningPositionLines |> List.map (List.map <| positionAndOwnerAt)
 
 
 matchingWinnerLinesForPlayer : Player -> Board -> List (List ( Position, Maybe Player ))
@@ -319,15 +309,15 @@ view model =
 
 
 viewBoard : Model -> Html Msg
-viewBoard model =
+viewBoard ({ currentPlayer, board } as model) =
     let
         positionsToHighlight =
             winningPositionsOfWinner model
 
         isComputer =
-            isPlayerComputer model.currentPlayer model
+            isPlayerComputer currentPlayer model
     in
-        model.board
+        board
             |> board2D
             |> List.map (\row -> viewRow row ( positionsToHighlight, isComputer ))
             |> table []
@@ -366,51 +356,40 @@ viewBoardHeader ({ currentPlayer, gameStatus } as model) =
                 NotStarted ->
                     span [ class "banner" ] [ text "Tic Tac Toe" ]
     in
-        div [ class "boardHeader" ]
-            [ view_ ]
+        div [ class "boardHeader" ] [ view_ ]
 
 
 viewPlayer : Player -> Html Msg
 viewPlayer player =
-    span
-        [ class (playerCssClass (Just player)) ]
-        [ text (toString player) ]
+    span [ class (playerCssClass (Just player)) ] [ text (toString player) ]
 
 
 viewPlayerStatus : Player -> Bool -> Bool -> Html Msg
-viewPlayerStatus player isCurrent isComputer =
+viewPlayerStatus player isCurrentPlayer isComputer =
     let
-        defaultWrapperClass =
-            case player of
-                X ->
-                    "playerStatus left"
-
-                O ->
-                    "playerStatus right"
-
-        wrapperClass =
-            if isCurrent then
-                defaultWrapperClass ++ " active"
+        activeClass =
+            if isCurrentPlayer then
+                " active"
             else
-                defaultWrapperClass
+                ""
 
         alsoKnownAs =
             if isComputer then
-                "Computer"
+                span [ class "alsoKnown" ] [ text "Computer" ]
             else
-                "You"
+                text ""
     in
         case player of
             X ->
-                span [ class wrapperClass ]
+                span [ class ("playerStatus left " ++ activeClass) ]
                     [ viewPlayer player
                     , span [ class "arrow" ] [ text "◀︎" ]
-                    , span [] [ text alsoKnownAs ]
+                    , alsoKnownAs
                     ]
 
             O ->
-                span [ class wrapperClass ]
-                    [ span [] [ text alsoKnownAs ]
+                span [ class ("playerStatus right " ++ activeClass) ]
+                    [ alsoKnownAs
                     , span [ class "arrow" ] [ text "▶" ]
                     , viewPlayer player
                     ]
@@ -419,51 +398,42 @@ viewPlayerStatus player isCurrent isComputer =
 viewBoardFooter : Model -> Html Msg
 viewBoardFooter { gameStatus } =
     let
-        buttons =
+        newGameButtons =
             case gameStatus of
                 InProgress ->
                     text ""
 
                 _ ->
                     div []
-                        [ text "Play As: "
-                        , buttonNewGame "2 Players" TwoPlayerGame
+                        [ div [] [ text "Play new game as: " ]
+                        , buttonNewGame "2 Players" TwoPlayersGame
                         , buttonNewGame "With Computer" PlayWithComputer
                         ]
     in
-        div [ class "boardFooter" ] [ buttons ]
+        div [ class "boardFooter" ] [ newGameButtons ]
 
 
 viewRow : List ( Position, Maybe Player ) -> ( List Position, Bool ) -> Html Msg
 viewRow row additionalInfo =
-    row
-        |> List.map (\position -> viewPosition position additionalInfo)
-        |> tr []
+    row |> List.map (\position -> viewPosition position additionalInfo) |> tr []
 
 
 viewPosition : ( Position, Maybe Player ) -> ( List Position, Bool ) -> Html Msg
 viewPosition ( position, owner ) ( positionsToHighlight, isComputer ) =
     let
-        defaultClass =
-            playerCssClass owner
-
-        updatedClass =
+        className =
             if List.member position positionsToHighlight then
-                defaultClass ++ " highlight"
+                playerCssClass owner ++ " highlight"
             else
-                defaultClass
+                playerCssClass owner
 
-        messageToDispatch =
+        msgToSend =
             if isComputer then
                 NoOp
             else
                 (OwnPosition position)
     in
-        td
-            [ class updatedClass
-            , onClick messageToDispatch
-            ]
-            [ text (ownerName owner) ]
+        td [ class className, onClick msgToSend ] [ text (ownerName owner) ]
 
 
 ownerName : Maybe Player -> String
@@ -488,9 +458,21 @@ playerCssClass maybePlayer =
 
 buttonNewGame : String -> Msg -> Html Msg
 buttonNewGame buttonText msg =
-    button
-        [ class "newGame", onClick msg ]
-        [ text buttonText ]
+    button [ class "newGame", onClick msg ] [ text buttonText ]
+
+
+winningPositionsOfWinner : Model -> List Position
+winningPositionsOfWinner { gameStatus, board } =
+    case gameStatus of
+        WonBy winner ->
+            matchingWinnerLinesForPlayer winner board
+                |> List.head
+                |> Maybe.withDefault []
+                |> List.map Tuple.first
+                |> List.map identity
+
+        _ ->
+            []
 
 
 

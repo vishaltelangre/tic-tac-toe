@@ -99,6 +99,10 @@ td.highlight {
   color: #ff0;
 }
 
+.alsoKnown {
+    font-size: 10px;
+}
+
 .newGame {
   font-size: 16px;
   background: rgba(15, 90, 15, 1);
