@@ -33,6 +33,7 @@ type alias Board =
 type alias Model =
     { board : Board
     , currentPlayer : Player
+    , computer : Maybe Player
     , gameStatus : GameStatus
     }
 
@@ -41,6 +42,7 @@ init : ( Model, Cmd Msg )
 init =
     { board = initBoard
     , currentPlayer = O
+    , computer = Nothing
     , gameStatus = NotStarted
     }
         ! [ Random.generate SetInitialPlayer randomPlayer ]
@@ -87,6 +89,16 @@ randomPlayer =
             )
 
 
+randomListGenerator : Board -> Random.Generator (List Position)
+randomListGenerator board =
+    let
+        totalNotOwnedPositions =
+            board |> notOwnedPositions |> List.length
+    in
+        Random.int 0 totalNotOwnedPositions
+            |> Random.list totalNotOwnedPositions
+
+
 opponentPlayer : Player -> Player
 opponentPlayer player =
     case player of
@@ -97,36 +109,97 @@ opponentPlayer player =
             X
 
 
+isPlayerComputer : Player -> Model -> Bool
+isPlayerComputer player { computer } =
+    case computer of
+        Just computerPlayer ->
+            player == computerPlayer
+
+        _ ->
+            False
+
+
 
 ---- UPDATE ----
 
 
 type Msg
-    = NewGame
+    = NoOp
+    | TwoPlayerGame
+    | PlayWithComputer
     | SetInitialPlayer Player
+    | TryOwningPositionAsComputer (List Position)
     | OwnPosition Position
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        NewGame ->
+        NoOp ->
+            model ! []
+
+        TwoPlayerGame ->
             let
                 ( newModel, cmd ) =
                     init
             in
                 { newModel | gameStatus = InProgress } ! [ cmd ]
 
+        PlayWithComputer ->
+            let
+                ( newModel, cmd ) =
+                    init
+            in
+                { newModel | gameStatus = InProgress, computer = Just X } ! [ cmd ]
+
         SetInitialPlayer player ->
-            { model | currentPlayer = player } ! []
+            { model | currentPlayer = player }
+                ! [ Random.generate TryOwningPositionAsComputer (randomListGenerator model.board) ]
+
+        TryOwningPositionAsComputer randomList ->
+            case model.gameStatus of
+                InProgress ->
+                    case randomPosition randomList (notOwnedPositions model.board) of
+                        Just position ->
+                            if isPlayerComputer model.currentPlayer model then
+                                update (OwnPosition position) model
+                            else
+                                model ! []
+
+                        Nothing ->
+                            model ! []
+
+                _ ->
+                    model ! []
 
         OwnPosition position ->
             case model.gameStatus of
                 InProgress ->
-                    (ownPosition position model |> updateGameStatus) ! []
+                    let
+                        newModel =
+                            (ownPosition position model |> updateGameStatus)
+                    in
+                        newModel
+                            ! [ Random.generate TryOwningPositionAsComputer (randomListGenerator newModel.board) ]
 
                 _ ->
                     model ! []
+
+
+randomPosition : List Position -> List Position -> Maybe Position
+randomPosition randomList positions =
+    List.map2 (,) randomList positions
+        |> List.sortBy Tuple.first
+        |> List.unzip
+        |> Tuple.second
+        |> List.head
+
+
+notOwnedPositions : Board -> List Position
+notOwnedPositions board =
+    board
+        |> Dict.filter (\_ owner -> owner == Nothing)
+        |> Dict.keys
 
 
 ownPosition : Position -> Model -> Model
@@ -182,7 +255,8 @@ winningPositionsOfWinner { gameStatus, board } =
     case gameStatus of
         WonBy winner ->
             matchingWinnerLinesForPlayer winner board
-                |> List.concat
+                |> List.head
+                |> Maybe.withDefault []
                 |> List.map Tuple.first
                 |> List.map identity
 
@@ -249,10 +323,13 @@ viewBoard model =
     let
         positionsToHighlight =
             winningPositionsOfWinner model
+
+        isComputer =
+            isPlayerComputer model.currentPlayer model
     in
         model.board
             |> board2D
-            |> List.map (viewRow positionsToHighlight)
+            |> List.map (\row -> viewRow row ( positionsToHighlight, isComputer ))
             |> table []
 
 
@@ -266,14 +343,14 @@ board2D board =
 
 
 viewBoardHeader : Model -> Html Msg
-viewBoardHeader { currentPlayer, gameStatus } =
+viewBoardHeader ({ currentPlayer, gameStatus } as model) =
     let
         view_ =
             case gameStatus of
                 InProgress ->
                     div []
-                        [ viewPlayerStatus X (currentPlayer == X)
-                        , viewPlayerStatus O (currentPlayer == O)
+                        [ viewPlayerStatus X (currentPlayer == X) (isPlayerComputer X model)
+                        , viewPlayerStatus O (currentPlayer == O) (isPlayerComputer O model)
                         ]
 
                 Drawn ->
@@ -300,8 +377,8 @@ viewPlayer player =
         [ text (toString player) ]
 
 
-viewPlayerStatus : Player -> Bool -> Html Msg
-viewPlayerStatus player current =
+viewPlayerStatus : Player -> Bool -> Bool -> Html Msg
+viewPlayerStatus player isCurrent isComputer =
     let
         defaultWrapperClass =
             case player of
@@ -312,37 +389,60 @@ viewPlayerStatus player current =
                     "playerStatus right"
 
         wrapperClass =
-            if current then
+            if isCurrent then
                 defaultWrapperClass ++ " active"
             else
                 defaultWrapperClass
+
+        alsoKnownAs =
+            if isComputer then
+                "Computer"
+            else
+                "You"
     in
         case player of
             X ->
                 span [ class wrapperClass ]
                     [ viewPlayer player
                     , span [ class "arrow" ] [ text "◀︎" ]
+                    , span [] [ text alsoKnownAs ]
                     ]
 
             O ->
                 span [ class wrapperClass ]
-                    [ span [ class "arrow" ] [ text "▶" ]
+                    [ span [] [ text alsoKnownAs ]
+                    , span [ class "arrow" ] [ text "▶" ]
                     , viewPlayer player
                     ]
 
 
 viewBoardFooter : Model -> Html Msg
 viewBoardFooter { gameStatus } =
-    p [ class "boardFooter" ] [ buttonNewGame gameStatus ]
+    let
+        buttons =
+            case gameStatus of
+                InProgress ->
+                    text ""
+
+                _ ->
+                    div []
+                        [ text "Play As: "
+                        , buttonNewGame "2 Players" TwoPlayerGame
+                        , buttonNewGame "With Computer" PlayWithComputer
+                        ]
+    in
+        div [ class "boardFooter" ] [ buttons ]
 
 
-viewRow : List Position -> List ( Position, Maybe Player ) -> Html Msg
-viewRow positionsToHighlight row =
-    List.map (viewPosition positionsToHighlight) row |> tr []
+viewRow : List ( Position, Maybe Player ) -> ( List Position, Bool ) -> Html Msg
+viewRow row additionalInfo =
+    row
+        |> List.map (\position -> viewPosition position additionalInfo)
+        |> tr []
 
 
-viewPosition : List Position -> ( Position, Maybe Player ) -> Html Msg
-viewPosition positionsToHighlight ( position, owner ) =
+viewPosition : ( Position, Maybe Player ) -> ( List Position, Bool ) -> Html Msg
+viewPosition ( position, owner ) ( positionsToHighlight, isComputer ) =
     let
         defaultClass =
             playerCssClass owner
@@ -352,10 +452,16 @@ viewPosition positionsToHighlight ( position, owner ) =
                 defaultClass ++ " highlight"
             else
                 defaultClass
+
+        messageToDispatch =
+            if isComputer then
+                NoOp
+            else
+                (OwnPosition position)
     in
         td
             [ class updatedClass
-            , onClick (OwnPosition position)
+            , onClick messageToDispatch
             ]
             [ text (ownerName owner) ]
 
@@ -380,16 +486,11 @@ playerCssClass maybePlayer =
             ""
 
 
-buttonNewGame : GameStatus -> Html Msg
-buttonNewGame gameStatus =
-    case gameStatus of
-        InProgress ->
-            text ""
-
-        _ ->
-            button
-                [ class "newGame", onClick NewGame ]
-                [ text "Start New Game" ]
+buttonNewGame : String -> Msg -> Html Msg
+buttonNewGame buttonText msg =
+    button
+        [ class "newGame", onClick msg ]
+        [ text buttonText ]
 
 
 
