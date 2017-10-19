@@ -28,6 +28,7 @@ td, tr, table {
 
 table {
   border-spacing: 5px;
+  clear: both;
 }
 
 td {
@@ -99,12 +100,17 @@ td.highlight {
   color: #ff0;
 }
 
+.alsoKnown {
+    font-size: 10px;
+}
+
 .newGame {
   font-size: 16px;
   background: rgba(15, 90, 15, 1);
   border: 1px solid rgb(3, 53, 3);
   color: #fff;
   padding: 5px;
+  margin: 5px;
   border-radius: 5px;
   cursor: pointer;
 }
