@@ -150,8 +150,16 @@ update msg ({ currentPlayer, board, gameStatus } as model) =
                 cmd =
                     randomListGenerator board
                         |> Random.generate OwnPositionAsComputer
+
+                newModel =
+                    { model | currentPlayer = player }
             in
-                { model | currentPlayer = player } ! [ cmd ]
+                case model.computerPlayer of
+                    Just _ ->
+                        { newModel | computerPlayer = Just player } ! [ cmd ]
+
+                    Nothing ->
+                        newModel ! [ cmd ]
 
         OwnPosition position ->
             case gameStatus of
@@ -347,11 +355,18 @@ viewBoardHeader ({ currentPlayer, gameStatus } as model) =
                     text "Game is drawn!"
 
                 WonBy player ->
-                    span []
-                        [ text "Player "
-                        , viewPlayer player
-                        , text " is winner! 🎉"
-                        ]
+                    let
+                        alsoKnownAs =
+                            if (isPlayerComputer player model) then
+                                " (computer)"
+                            else
+                                ""
+                    in
+                        span []
+                            [ text "Player "
+                            , viewPlayer player
+                            , text (alsoKnownAs ++ " is winner! 🎉")
+                            ]
 
                 NotStarted ->
                     span [ class "banner" ] [ text "Tic Tac Toe" ]
