@@ -4,7 +4,10 @@ import Dict exposing (Dict)
 import Html exposing (Html, text, div, table, tr, td, button, span, p)
 import Html.Attributes exposing (class, href)
 import Html.Events exposing (onClick)
+import Process
 import Random
+import Task
+import Time
 
 
 ---- MODEL ----
@@ -216,7 +219,16 @@ ownPositionAsComputer randomPosition ({ currentPlayer, gameStatus } as model) =
         case randomPosition of
             Just position ->
                 if shouldTryOwningPosition then
-                    update (OwnPosition position) model
+                    let
+                        ( randomDelay, _ ) =
+                            Random.initialSeed position
+                                |> Random.step (Random.float 1 3)
+
+                        cmd =
+                            Process.sleep (Time.second * randomDelay)
+                                |> Task.perform (always <| OwnPosition position)
+                    in
+                        model ! [ cmd ]
                 else
                     model ! []
 
@@ -382,15 +394,15 @@ viewPlayer player =
 viewPlayerStatus : Player -> Bool -> Bool -> Html Msg
 viewPlayerStatus player isCurrentPlayer isComputer =
     let
-        activeClass =
+        ( activeClass, thinkingOrNot ) =
             if isCurrentPlayer then
-                " active"
+                ( " active", " thinking" )
             else
-                ""
+                ( "", "" )
 
         alsoKnownAs =
             if isComputer then
-                span [ class "alsoKnown" ] [ text "Computer" ]
+                span [ class "alsoKnown" ] [ text ("Computer" ++ thinkingOrNot) ]
             else
                 text ""
     in
