@@ -4,8 +4,15 @@ Play online at https://vishaltelangre.com/tic-tac-toe.
 
 ### Preview
 
-![Live Demo](https://user-images.githubusercontent.com/876195/31689283-8fdf9af2-b3ac-11e7-9a13-f43d0a7a7e65.gif)
+![Live Demo](https://user-images.githubusercontent.com/876195/31770096-fc05bac0-b4f3-11e7-9e73-36a719233f4e.gif)
 
+
+### Features
+
+- Play between 2 players
+- Play with a dumb computer 😜
+- The computer makes random moves and fakes that it is really thinking
+- Shows who's turn it is nicely
 
 ### To run locally
 
