@@ -10,8 +10,7 @@ Play online at https://vishaltelangre.com/tic-tac-toe.
 ### Features
 
 - Play between 2 players
-- Play with a dumb computer 😜
-- The computer makes random moves and fakes that it is really thinking
+- Play with the computer which may behave dumb or smart at times 😜
 - Shows who's turn it is nicely
 
 ### To run locally
