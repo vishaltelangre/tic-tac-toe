@@ -7,7 +7,7 @@ import Html.Events exposing (onClick)
 import Process
 import Random
 import Task
-import Time
+import Time exposing (Time)
 
 
 ---- MODEL ----
@@ -31,6 +31,10 @@ type alias Position =
 
 type alias Board =
     Dict Position (Maybe Player)
+
+
+type alias Move =
+    { position : Maybe Position, score : Int }
 
 
 type alias Model =
@@ -181,111 +185,85 @@ update msg ({ currentPlayer, board, gameStatus } as model) =
                     model ! []
 
         OwnPositionAsComputer randomList ->
-            let
-                randomPosition =
-                    notOwnedPositions board
-                        |> randomNotOwnedPosition randomList
-            in
-                ownPositionAsComputer randomPosition model
+            notOwnedPositions board
+                |> maybeRandomAvailablePosition randomList
+                |> ownPositionAsComputer model
 
 
 ownPosition : Position -> Model -> Model
 ownPosition position ({ currentPlayer, board } as model) =
     case Dict.get position board of
         Just Nothing ->
-            let
-                ownerInBoard _ =
-                    Just (Just currentPlayer)
-
-                updatedBoard =
-                    Dict.update position ownerInBoard board
-            in
-                { model
-                    | board = updatedBoard
-                    , currentPlayer = (opponentPlayer currentPlayer)
-                }
+            { model
+                | board = Dict.update position (currentPlayer |> Just |> Just |> always) board
+                , currentPlayer = (opponentPlayer currentPlayer)
+            }
 
         _ ->
             model
 
 
-ownPositionAsComputer : Maybe Position -> Model -> ( Model, Cmd Msg )
-ownPositionAsComputer randomPosition ({ currentPlayer, gameStatus, board } as model) =
-    let
-        shouldTryOwningPosition =
-            isPlayerComputer currentPlayer model
-                && (gameStatus == InProgress)
-    in
-        case randomPosition of
-            Just position ->
+ownPositionAsComputer : Model -> Maybe Position -> ( Model, Cmd Msg )
+ownPositionAsComputer ({ currentPlayer, gameStatus, board } as model) maybeRandomPosition =
+    case maybeRandomPosition of
+        Just position ->
+            let
+                shouldTryOwningPosition =
+                    isPlayerComputer currentPlayer model
+                        && (gameStatus == InProgress)
+            in
                 if shouldTryOwningPosition then
                     let
-                        {--
-                            Let the computer make an intelligent move if the
-                            available number of positions are between 3 and 7!
-
-                            Am I dumb now, huh?
-                        --}
-                        randomThresholdOfAvailablePositions =
-                            Random.initialSeed position
-                                |> Random.step (Random.int 3 7)
-                                |> Tuple.first
-
-                        shouldMakeComputerSmart =
-                            List.length (notOwnedPositions board)
-                                |> (>=) randomThresholdOfAvailablePositions
-
                         msg =
-                            if shouldMakeComputerSmart then
-                                case minimax model currentPlayer of
-                                    Just move ->
-                                        OwnPosition (Maybe.withDefault position move.position)
-
-                                    _ ->
-                                        OwnPosition position
-                            else
-                                OwnPosition position
-
-                        ( randomDelay, _ ) =
-                            Random.initialSeed position
-                                |> Random.step (Random.float 1 2)
+                            OwnPosition (nextPositionChosenByComputer position model)
 
                         cmd =
-                            Process.sleep (Time.second * randomDelay)
-                                |> Task.perform (always <| msg)
+                            randomDelay position |> Process.sleep |> Task.perform (always msg)
                     in
                         model ! [ cmd ]
                 else
                     model ! []
 
-            Nothing ->
-                model ! []
+        Nothing ->
+            model ! []
 
 
-type alias Move =
-    { position : Maybe Position, score : Int }
+nextPositionChosenByComputer : Position -> Model -> Position
+nextPositionChosenByComputer defaultPosition ({ board, currentPlayer } as model) =
+    let
+        {--
+            Let the computer make an intelligent move if the
+            available number of positions are between 3 and 7!
+
+            Am I dumb now, huh?
+        --}
+        randomThreshold =
+            Random.initialSeed defaultPosition
+                |> Random.step (Random.int 3 7)
+                |> Tuple.first
+
+        shouldMakeSmartMove =
+            (notOwnedPositions board |> List.length) <= randomThreshold
+    in
+        if shouldMakeSmartMove then
+            case minimax model currentPlayer of
+                Just { position } ->
+                    Maybe.withDefault defaultPosition position
+
+                _ ->
+                    defaultPosition
+        else
+            defaultPosition
 
 
 minimax : Model -> Player -> Maybe Move
 minimax ({ board } as model) player =
     let
-        moveTo position =
-            let
-                board_ =
-                    Dict.update position (always (Just (Just player))) board
-
-                model_ =
-                    { model | board = board_ }
-
-                lookAheadScore =
-                    minimax model_ (opponentPlayer player)
-                        |> Maybe.withDefault (Move (Just position) 0)
-                        |> .score
-            in
-                Move (Just position) lookAheadScore
-
         availablePositions =
             notOwnedPositions board
+
+        moveTo position =
+            Move (Just position) (lookAheadScoreAtPosition position model player)
 
         moves =
             availablePositions |> List.map moveTo |> List.sortBy .score
@@ -301,6 +279,17 @@ minimax ({ board } as model) player =
             moves |> List.reverse |> List.head
         else
             moves |> List.head
+
+
+lookAheadScoreAtPosition : Position -> Model -> Player -> Int
+lookAheadScoreAtPosition position ({ board } as model) player =
+    let
+        newBoard =
+            Dict.update position (player |> Just |> Just |> always) board
+    in
+        minimax { model | board = newBoard } (opponentPlayer player)
+            |> Maybe.withDefault (Move (Just position) 0)
+            |> .score
 
 
 updateGameStatus : Model -> Model
@@ -334,8 +323,8 @@ randomListGenerator board =
         totalNotOwnedPositions |> Random.int 0 |> Random.list totalNotOwnedPositions
 
 
-randomNotOwnedPosition : List Position -> List Position -> Maybe Position
-randomNotOwnedPosition randomList positions =
+maybeRandomAvailablePosition : List Position -> List Position -> Maybe Position
+maybeRandomAvailablePosition randomList positions =
     List.map2 (,) randomList positions
         |> List.sortBy Tuple.first
         |> List.unzip
@@ -380,6 +369,14 @@ ownerAtPosition position board =
 
         _ ->
             Nothing
+
+
+randomDelay : Int -> Time.Time
+randomDelay randomSeed =
+    Random.initialSeed randomSeed
+        |> Random.step (Random.float 1 2)
+        |> Tuple.first
+        |> (*) Time.second
 
 
 
@@ -435,17 +432,13 @@ viewBoardHeader ({ currentPlayer, gameStatus } as model) =
 
                 WonBy player ->
                     let
-                        alsoKnownAs =
-                            if (isPlayerComputer player model) then
-                                " (computer)"
+                        playerPrefix =
+                            if isPlayerComputer player model then
+                                "Computer "
                             else
-                                ""
+                                " Player "
                     in
-                        span []
-                            [ text "Player "
-                            , viewPlayer player
-                            , text (alsoKnownAs ++ " is winner! 🎉")
-                            ]
+                        span [] [ text playerPrefix, viewPlayer player, text " is winner! 🎉" ]
 
                 NotStarted ->
                     span [ class "banner" ] [ text "Tic Tac Toe" ]
