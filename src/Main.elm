@@ -210,7 +210,7 @@ ownPosition position ({ currentPlayer, board } as model) =
 
 
 ownPositionAsComputer : Maybe Position -> Model -> ( Model, Cmd Msg )
-ownPositionAsComputer randomPosition ({ currentPlayer, gameStatus } as model) =
+ownPositionAsComputer randomPosition ({ currentPlayer, gameStatus, board } as model) =
     let
         shouldTryOwningPosition =
             isPlayerComputer currentPlayer model
@@ -220,13 +220,39 @@ ownPositionAsComputer randomPosition ({ currentPlayer, gameStatus } as model) =
             Just position ->
                 if shouldTryOwningPosition then
                     let
+                        {--
+                            Let the computer make an intelligent move if the
+                            available number of positions are between 3 and 7!
+
+                            Am I dumb now, huh?
+                        --}
+                        randomThresholdOfAvailablePositions =
+                            Random.initialSeed position
+                                |> Random.step (Random.int 3 7)
+                                |> Tuple.first
+
+                        shouldMakeComputerSmart =
+                            List.length (notOwnedPositions board)
+                                |> (>=) randomThresholdOfAvailablePositions
+
+                        msg =
+                            if shouldMakeComputerSmart then
+                                case minimax model currentPlayer of
+                                    Just move ->
+                                        OwnPosition (Maybe.withDefault position move.position)
+
+                                    _ ->
+                                        OwnPosition position
+                            else
+                                OwnPosition position
+
                         ( randomDelay, _ ) =
                             Random.initialSeed position
-                                |> Random.step (Random.float 1 3)
+                                |> Random.step (Random.float 1 2)
 
                         cmd =
                             Process.sleep (Time.second * randomDelay)
-                                |> Task.perform (always <| OwnPosition position)
+                                |> Task.perform (always <| msg)
                     in
                         model ! [ cmd ]
                 else
@@ -234,6 +260,47 @@ ownPositionAsComputer randomPosition ({ currentPlayer, gameStatus } as model) =
 
             Nothing ->
                 model ! []
+
+
+type alias Move =
+    { position : Maybe Position, score : Int }
+
+
+minimax : Model -> Player -> Maybe Move
+minimax ({ board } as model) player =
+    let
+        moveTo position =
+            let
+                board_ =
+                    Dict.update position (always (Just (Just player))) board
+
+                model_ =
+                    { model | board = board_ }
+
+                lookAheadScore =
+                    minimax model_ (opponentPlayer player)
+                        |> Maybe.withDefault (Move (Just position) 0)
+                        |> .score
+            in
+                Move (Just position) lookAheadScore
+
+        availablePositions =
+            notOwnedPositions board
+
+        moves =
+            availablePositions |> List.map moveTo |> List.sortBy .score
+    in
+        if isPlayerWinner player board then
+            if isPlayerComputer player model then
+                Just (Move Nothing 1)
+            else
+                Just (Move Nothing -1)
+        else if availablePositions |> List.isEmpty then
+            Just (Move Nothing 0)
+        else if isPlayerComputer player model then
+            moves |> List.reverse |> List.head
+        else
+            moves |> List.head
 
 
 updateGameStatus : Model -> Model
