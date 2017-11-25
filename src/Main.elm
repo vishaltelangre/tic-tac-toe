@@ -127,6 +127,7 @@ type Msg
     | TwoPlayersGame
     | PlayWithComputer
     | SetInitialPlayer Player
+    | SetComputerPlayer Player
     | OwnPositionAsComputer (List Position)
     | OwnPosition Position
 
@@ -155,18 +156,22 @@ update msg ({ currentPlayer, board, gameStatus } as model) =
         SetInitialPlayer player ->
             let
                 cmd =
+                    Random.generate SetComputerPlayer randomPlayerGenerator
+            in
+                { model | currentPlayer = player } ! [ cmd ]
+
+        SetComputerPlayer player ->
+            let
+                cmd =
                     randomListGenerator board
                         |> Random.generate OwnPositionAsComputer
-
-                newModel =
-                    { model | currentPlayer = player }
             in
                 case model.computerPlayer of
                     Just _ ->
-                        { newModel | computerPlayer = Just player } ! [ cmd ]
+                        { model | computerPlayer = Just player } ! [ cmd ]
 
                     Nothing ->
-                        newModel ! [ cmd ]
+                        model ! [ cmd ]
 
         OwnPosition position ->
             case gameStatus of
@@ -235,7 +240,7 @@ nextPositionChosenByComputer defaultPosition ({ board, currentPlayer } as model)
             Let the computer make an intelligent move if the
             available number of positions are between 3 and 7!
 
-            Am I dumb now, huh?
+            Do you think that the computer is that much dumb now, huh?
         --}
         randomThreshold =
             Random.initialSeed defaultPosition
