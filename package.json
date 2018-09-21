@@ -1,0 +1,22 @@
+{
+  "name": "elm-tic-tac-toe",
+  "version": "1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/vishaltelangre/elm-tic-tac-toe.git"
+  },
+  "author": "Vishal Telangre <the@vishaltelangre.com>",
+  "license": "MIT",
+  "dependencies": {
+    "create-elm-app": "1.2.3"
+  },
+  "bugs": {
+    "url": "https://github.com/vishaltelangre/elm-tic-tac-toe/issues"
+  },
+  "homepage": "https://github.com/vishaltelangre/elm-tic-tac-toe#readme",
+  "devDependencies": {},
+  "scripts": {
+    "build": "elm-app build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}

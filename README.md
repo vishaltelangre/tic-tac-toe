@@ -1,6 +1,6 @@
 # Tic Tac Toe in Elm
 
-Play online at https://vishaltelangre.com/tic-tac-toe.
+Play online at https://tic-tac-toe.vishaltelangre.com.
 
 ### Preview
 
@@ -16,12 +16,12 @@ Play online at https://vishaltelangre.com/tic-tac-toe.
 ### To run locally
 
 ```
-npm install create-elm-app -g
-
+npm install
 elm-app start
 ```
 
 ### To make production build
 
 ```
-PUBLIC_URL=./ elm-app build
+npm run-script build
+```

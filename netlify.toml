@@ -1,0 +1,6 @@
+[Settings]
+
+[build]
+  base    = ""
+  publish = "build"
+  command = "npm run-script build"
